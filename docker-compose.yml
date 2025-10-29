@@ -1,0 +1,38 @@
+services:
+  feeds-db:
+    image: postgres:18-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${FEEDS_DB_PASSWD}
+      POSTGRES_USER: ${FEEDS_DB_USER}
+      POSTGRES_DB: ${FEEDS_DB_NAME}
+    volumes:
+      - feeds-db-vol:/var/lib/postgresql/data 
+    ports:
+      - 5433:5432
+
+  account-db:
+    image: postgres:18-alpine
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${ACCOUNT_DB_PASSWD}
+      POSTGRES_USER: ${ACCOUNT_DB_USER}
+      POSTGRES_DB: ${ACCOUNT_DB_NAME}
+    volumes:
+      - account-db-vol:/var/lib/postgresql/data 
+    ports:
+      - 5432:5432
+ 
+  broker:
+    image: rabbitmq:4.1-management-alpine
+    restart: always
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - broker-vol:/var/lib/rabbitmq 
+
+volumes:
+  feeds-db-vol:
+  account-db-vol:
+  broker-vol:

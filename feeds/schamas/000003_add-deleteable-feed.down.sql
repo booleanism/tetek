@@ -1,0 +1,1 @@
+ALTER TABLE IF EXISTS feeds DROP COLUMN deleted_at;
