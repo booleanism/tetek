@@ -1,6 +1,8 @@
 package router
 
 import (
+	"encoding/json"
+
 	"github.com/booleanism/tetek/account/amqp"
 	"github.com/booleanism/tetek/auth/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -23,6 +25,11 @@ type loginResponse struct {
 	Detail  loginRequest `json:"detail"`
 }
 
+func (r loginResponse) Json() []byte {
+	j, _ := json.Marshal(r)
+	return j
+}
+
 func (req loginRequest) toUser() amqp.User {
 	return amqp.User{
 		Uname:  req.Uname,
@@ -35,11 +42,11 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		loggr.Log.V(4).Info("new incoming login request")
 		req := loginRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.FromError(res.Code, ctx.Status(fiber.StatusBadRequest).JSON(&res))
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind request", "body", ctx.Body())
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		jwt, err := logRec.Login(req.toUser())
@@ -56,56 +63,32 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 			return ctx.Status(fiber.StatusOK).JSONP(res)
 		}
 
-		if err.Code() == errro.EAUTH_JWT_GENERATAION_FAIL {
-			res := loginResponse{
-				Code:    errro.EAUTH_JWT_GENERATAION_FAIL,
-				Message: err.Error(),
-				Detail:  req,
-			}
-			return ctx.Status(fiber.StatusInternalServerError).JSON(res)
+		res := loginResponse{
+			Code:    err.Code(),
+			Message: err.Error(),
+			Detail:  req,
 		}
-
-		if err.Code() == errro.EACCOUNT_SERVICE_UNAVAILABLE {
-			res := loginResponse{
-				Code:    err.Code(),
-				Message: err.Error(),
-				Detail:  req,
-			}
-			return ctx.Status(fiber.StatusServiceUnavailable).JSON(res)
+		if err.Code() == errro.EAUTH_JWT_GENERATAION_FAIL || err.Code() == errro.EACCOUNT_SERVICE_UNAVAILABLE {
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
 		}
 
 		if err.Code() == errro.EACCOUNT_NO_USER {
-			res := loginResponse{
-				Code:    err.Code(),
-				Message: err.Error(),
-				Detail:  req,
-			}
-			return ctx.Status(fiber.StatusExpectationFailed).JSON(res)
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusNotFound)
 		}
 
 		if err.Code() == errro.EAUTH_INVALID_LOGIN_PARAM {
-			res := loginResponse{
-				Code:    err.Code(),
-				Message: err.Error(),
-				Detail:  req,
-			}
-			return ctx.Status(fiber.StatusExpectationFailed).JSON(res)
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusExpectationFailed)
 		}
 
 		if err.Code() == errro.EAUTH_INVALID_CREDS {
-			res := loginResponse{
-				Code:    err.Code(),
-				Message: err.Error(),
-				Detail:  req,
-			}
-			return ctx.Status(fiber.StatusUnauthorized).JSON(res)
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
-		res := loginResponse{
+		res = loginResponse{
 			Code:    errro.EACCOUNT_CANT_LOGIN,
 			Message: "failed to proccess login request",
 			Detail:  req,
 		}
-		return ctx.Status(fiber.StatusInternalServerError).JSON(res)
+		return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

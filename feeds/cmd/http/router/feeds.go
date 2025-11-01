@@ -1,6 +1,8 @@
 package router
 
 import (
+	"encoding/json"
+
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/repo"
@@ -18,9 +20,13 @@ type getFeedsRequest struct {
 }
 
 type getFeedsResponse struct {
-	Code    int          `json:"code"`
-	Message string       `json:"message"`
-	Detail  []model.Feed `json:"detail"`
+	helper.GenericResponse
+	Detail []model.Feed `json:"detail"`
+}
+
+func (r *getFeedsResponse) Json() []byte {
+	j, _ := json.Marshal(r)
+	return j
 }
 
 func Feeds(rec recipes.FeedRecipes) fiber.Handler {
@@ -31,11 +37,11 @@ func Feeds(rec recipes.FeedRecipes) fiber.Handler {
 		}
 
 		req := getFeedsRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.New(res.Code, res.Message)
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind")
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		jwt, _ := ctx.Locals("jwt").(*amqp.AuthResult)
@@ -47,26 +53,28 @@ func Feeds(rec recipes.FeedRecipes) fiber.Handler {
 		f, err := rec.Feeds(ctx, filter, jwt)
 		if err == nil {
 			res := getFeedsResponse{
-				Code:    errro.SUCCESS,
-				Message: "fetch feeds success",
-				Detail:  f,
+				GenericResponse: helper.GenericResponse{
+					Code:    errro.SUCCESS,
+					Message: "fetch feeds success",
+				},
+				Detail: f,
 			}
 			loggr.Log.V(4).Info(res.Message)
 			return ctx.Status(fiber.StatusOK).JSON(&res)
 		}
 
 		if err.Code() == errro.EFEEDS_NO_FEEDS {
-			res := getFeedsResponse{
+			res := helper.GenericResponse{
 				Code:    err.Code(),
 				Message: err.Error(),
 			}
 			return ctx.Status(fiber.StatusNotFound).JSON(res)
 		}
 
-		res := getFeedsResponse{
+		res := helper.GenericResponse{
 			Code:    errro.EFEEDS_DB_ERR,
 			Message: "fail to fetch feeds",
 		}
-		return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
+		return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

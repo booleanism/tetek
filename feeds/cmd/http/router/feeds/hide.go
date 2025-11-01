@@ -16,33 +16,32 @@ type hideRequest struct {
 }
 
 type hideResponse struct {
-	Code    int         `json:"code"`
-	Message string      `json:"message"`
-	Detail  hideRequest `json:"detail"`
+	helper.GenericResponse
+	Detail hideRequest `json:"detail"`
 }
 
 func Hide(rec recipes.FeedRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		loggr.Log.V(4).Info("new incoming hide request")
 		req := hideRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.New(res.Code, res.Message)
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind request", "body", ctx.Body())
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		jwt, ok := ctx.Locals("jwt").(*amqp.AuthResult)
 		if !ok {
-			res := newFeedResponse{
-				Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
-				Message: "does not represent jwt type",
-			}
-			return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
-				e := errro.FromError(res.Code, ctx.Status(fiber.StatusInternalServerError).JSON(&res))
+			return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
+				res := helper.GenericResponse{
+					Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
+					Message: "does not represent jwt type",
+				}
+				e := errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON)
 				z.Error(e, res.Message)
 				return e
-			}).ToFiber()
+			})
 		}
 
 		ff := repo.FeedsFilter{
@@ -52,7 +51,7 @@ func Hide(rec recipes.FeedRecipes) fiber.Handler {
 
 		err := rec.Hide(ctx, ff, jwt)
 		if err != nil {
-			res := hideResponse{
+			res := helper.GenericResponse{
 				Code:    err.Code(),
 				Message: err.Error(),
 			}
@@ -60,9 +59,11 @@ func Hide(rec recipes.FeedRecipes) fiber.Handler {
 		}
 
 		res := hideResponse{
-			Code:    errro.SUCCESS,
-			Message: "feed hidden",
-			Detail:  req,
+			GenericResponse: helper.GenericResponse{
+				Code:    errro.SUCCESS,
+				Message: "feed hidden",
+			},
+			Detail: req,
 		}
 		return ctx.Status(fiber.StatusOK).JSON(&res)
 	}

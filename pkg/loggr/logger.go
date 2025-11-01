@@ -29,3 +29,7 @@ func newLog(maxLevel int) *logger {
 func (l logger) Error(v int, log func(z logr.LogSink) errro.Error) errro.Error {
 	return log(Log.WithCallDepth(1).V(v).GetSink())
 }
+
+func (l logger) ErrorRes(v int, log func(z logr.LogSink) error) error {
+	return log(Log.WithCallDepth(1).V(v).GetSink())
+}

@@ -1,6 +1,8 @@
 package router
 
 import (
+	"encoding/json"
+
 	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -15,30 +17,37 @@ type profileRequest struct {
 }
 
 type profileResponse struct {
-	Detail model.User `json:"detail"`
 	helper.GenericResponse
+	Detail model.User `json:"detail"`
+}
+
+func (r profileResponse) Json() []byte {
+	j, _ := json.Marshal(r)
+	return j
 }
 
 func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		loggr.Log.V(4).Info("new incoming profile request")
 		req := profileRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.FromError(res.Code, ctx.Status(fiber.StatusBadRequest).JSON(&res))
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind request", "uri", ctx.OriginalURL())
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		if req.Uname == "" {
-			res := profileResponse{
-				GenericResponse: helper.GenericResponse{
-					Code:    errro.EACCOUNT_EMPTY_PARAM,
-					Message: "empty param",
-				},
+			res := helper.GenericResponse{
+				Code:    errro.EACCOUNT_EMPTY_PARAM,
+				Message: "uname empty",
 			}
 			loggr.Log.V(2).Info("invalid param", "param", req.Uname, "response", res)
-			return ctx.Status(fiber.StatusBadRequest).JSON(&res)
+			return loggr.Log.ErrorRes(4, func(z logr.LogSink) error {
+				e := errro.New(res.Code, res.Message)
+				z.Error(e, "uname parameter should not empty")
+				return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		u, err := rec.Profile(ctx.Context(), model.User{Uname: req.Uname})
@@ -51,7 +60,7 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 					},
 					Detail: model.User{Uname: req.Uname},
 				}
-				return ctx.Status(fiber.StatusNotFound).JSON(&res)
+				return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusNotFound)
 			}
 
 			res := profileResponse{
@@ -61,7 +70,7 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 				},
 				Detail: model.User{Uname: req.Uname},
 			}
-			return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
 		}
 
 		res := profileResponse{

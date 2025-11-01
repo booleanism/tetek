@@ -13,11 +13,6 @@ import (
 	"github.com/google/uuid"
 )
 
-type authResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
 type authRequest struct {
 	Authorization string `header:"Authorization"`
 }
@@ -39,35 +34,35 @@ func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 
 func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 	req := authRequest{}
-	if res, err := helper.BindRequest(ctx, &req); err != nil {
+	if err := helper.BindRequest(ctx, &req); err != nil {
 		return "", loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-			z.Error(err, res.Message)
-			return errro.New(res.Code, res.Message)
+			z.Error(err, "failed to bind request", "header", ctx.GetHeaders())
+			return errro.New(errro.INVALID_REQ, err.Error())
 		})
 	}
 
 	if req.Authorization == "" {
-		res := authResponse{
-			Code:    errro.EAUTH_MISSING_HEADER,
-			Message: "missing authorization header",
-		}
 		return "", loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+			res := helper.GenericResponse{
+				Code:    errro.EAUTH_MISSING_HEADER,
+				Message: "missing authorization header",
+			}
 			e := errro.New(res.Code, res.Message)
-			z.Error(e, "missing authorization header")
-			return e
+			z.Error(e, res.Message)
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 		})
 	}
 
 	jwt, ok := strings.CutPrefix(req.Authorization, "Bearer ")
 	if !ok {
-		res := authResponse{
+		res := helper.GenericResponse{
 			Code:    errro.EAUTH_MISSMATCH_AUTH_MECHANISM,
 			Message: "mismatch authorization mechanism",
 		}
 		return "", loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
 			e := errro.New(res.Code, res.Message)
 			z.Error(e, "mismatch authorization mechanism, expected Bearer")
-			return e
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 		})
 	}
 
@@ -80,7 +75,7 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 
 		jwt, er := checkJwt(ctx)
 		if er != nil {
-			res := authResponse{
+			res := helper.GenericResponse{
 				Code:    er.Code(),
 				Message: er.Error(),
 			}
@@ -99,28 +94,28 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 	id := uuid.NewString()
 	task := amqp.AuthTask{Jwt: jwt}
 	if err := auth.Publish(id, task); err != nil {
-		res := authResponse{
+		res := helper.GenericResponse{
 			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
 			Message: "auth service unavailable: publishing auth task",
 		}
-		return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
-			e := errro.FromError(res.Code, ctx.Status(fiber.StatusServiceUnavailable).JSON(&res))
+		return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
+			e := errro.New(res.Code, res.Message)
 			z.Error(err, res.Message, "id", id, "task", task)
-			return e
-		}).ToFiber()
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		})
 	}
 
 	authRes, err := auth.Consume(id)
 	if err != nil {
-		res := authResponse{
+		res := helper.GenericResponse{
 			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
 			Message: "auth service unavailable: consuming auth result",
 		}
 		return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
-			e := errro.FromError(res.Code, ctx.Status(fiber.StatusServiceUnavailable).JSON(&res))
+			e := errro.New(res.Code, res.Message)
 			z.Error(err, res.Message, "id", id, "task sent", task)
-			return e
-		}).ToFiber()
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		})
 	}
 
 	if authRes.Code == errro.SUCCESS {
@@ -129,13 +124,13 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 		return nil
 	}
 
-	res := authResponse{
+	res := helper.GenericResponse{
 		Code:    errro.EAUTH_JWT_VERIFY_FAIL,
 		Message: "authorization failed",
 	}
 	return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
-		e := errro.FromError(res.Code, ctx.Status(fiber.StatusUnauthorized).JSON(&res))
+		e := errro.New(res.Code, res.Message)
 		z.Info(2, "authorization failed", "id", id, "task", task, "auth result", authRes)
-		return e
-	}).ToFiber()
+		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+	})
 }

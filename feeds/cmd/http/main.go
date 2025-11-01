@@ -47,7 +47,7 @@ func main() {
 	{
 		api.Get("/", middleware.OptionalAuth(auth), router.Feeds(rec))
 		api.Post("/", middleware.Auth(auth), middleware.Feeds(rec), feeds.New(rec))
-		api.Delete("/", middleware.Feeds(rec), feeds.Delete(rec))
+		api.Delete("/:id<guid>", middleware.Feeds(rec), feeds.Delete(rec))
 		api.Put("/hide", middleware.Feeds(rec), feeds.Hide(rec))
 	}
 

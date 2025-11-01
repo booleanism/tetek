@@ -22,9 +22,8 @@ type newFeedRequest struct {
 }
 
 type newFeedResponse struct {
-	Code    int            `json:"code"`
-	Message string         `json:"message"`
-	Detail  newFeedRequest `json:"detail"`
+	helper.GenericResponse
+	Detail newFeedRequest `json:"detail"`
 }
 
 func (fr newFeedRequest) ToFeed() model.Feed {
@@ -45,42 +44,46 @@ func New(rec recipes.FeedRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		loggr.Log.V(4).Info("new incoming feed request")
 		req := newFeedRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.New(res.Code, res.Message)
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind request", "body", ctx.Body())
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		jwt, ok := ctx.Locals("jwt").(*amqp.AuthResult)
 		if !ok {
-			res := newFeedResponse{
-				Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
-				Message: "does not represent jwt type",
-			}
-			return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
-				e := errro.FromError(res.Code, ctx.Status(fiber.StatusInternalServerError).JSON(&res))
+			return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
+				res := helper.GenericResponse{
+					Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
+					Message: "does not represent jwt type",
+				}
+				e := errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON)
 				z.Error(e, res.Message)
 				return e
-			}).ToFiber()
+			})
 		}
 
 		f := req.ToFeed()
 		err := rec.New(ctx, f, jwt)
 		if err == nil {
 			res := newFeedResponse{
-				Code:    errro.SUCCESS,
-				Message: "success add new feed",
-				Detail:  req,
+				GenericResponse: helper.GenericResponse{
+					Code:    errro.SUCCESS,
+					Message: "success add new feed",
+				},
+				Detail: req,
 			}
 			loggr.Log.V(4).Info("new feed added")
 			return ctx.Status(fiber.StatusOK).JSON(&res)
 		}
 
 		res := newFeedResponse{
-			Code:    errro.EFEEDS_NEW_FAIL,
-			Message: "failed to create new feed",
-			Detail:  req,
+			GenericResponse: helper.GenericResponse{
+				Code:    errro.EFEEDS_NEW_FAIL,
+				Message: "failed to create new feed",
+			},
+			Detail: req,
 		}
 		return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
 	}

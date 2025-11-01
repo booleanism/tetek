@@ -1,6 +1,8 @@
 package helper
 
 import (
+	"encoding/json"
+
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/gofiber/fiber/v3"
 )
@@ -10,13 +12,19 @@ type GenericResponse struct {
 	Message string `json:"message"`
 }
 
-func BindRequest(ctx fiber.Ctx, req any) (*GenericResponse, error) {
+func (r GenericResponse) Json() []byte {
+	j, _ := json.Marshal(r)
+	return j
+}
+
+func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
 	err := ctx.Bind().All(req)
 	if err != nil {
-		return &GenericResponse{
+		r := &GenericResponse{
 			Code:    errro.INVALID_REQ,
 			Message: "malformat request, failed to bind the request",
-		}, nil
+		}
+		return errro.New(errro.INVALID_REQ, "malformat request, failed to bind the request").WithDetail(r.Json(), errro.TDETAIL_JSON)
 	}
-	return nil, nil
+	return nil
 }

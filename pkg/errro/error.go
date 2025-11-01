@@ -9,7 +9,13 @@ import (
 type Error interface {
 	error
 	Code() int
-	ToFiber() *fiber.Error
+	// TODO: use interface returning []byte for the detail
+	WithDetail(detail []byte, detailType int) *resErr
+}
+
+type ResError interface {
+	error
+	SendError(fiber.Ctx, int) error
 }
 
 const (
@@ -50,26 +56,24 @@ const (
 )
 
 type err struct {
-	c int
-	m string
-	e error
+	c      int
+	m      string
+	e      error
+	detail []byte
+	t      int
 }
+
+const (
+	TDETAIL_RAW = iota
+	TDETAIL_JSON
+)
 
 func New(code int, msg string) *err {
-	return &err{code, msg, errors.New(msg)}
+	return &err{code, msg, errors.New(msg), nil, 0}
 }
 
-func FromError(code int, e error) *err {
-	return &err{code, "", e}
-}
-
-func (e *err) ToFiber() *fiber.Error {
-	var errFib *fiber.Error
-	if ok := errors.As(e.e, &errFib); ok {
-		return errFib
-	}
-
-	return fiber.NewError(fiber.StatusInternalServerError, "failed to cast error into fiber.Error")
+func FromError(code int, msg string, e error) *err {
+	return &err{code, msg, e, nil, 0}
 }
 
 func (e *err) Error() string {
@@ -78,4 +82,31 @@ func (e *err) Error() string {
 
 func (e *err) Code() int {
 	return e.c
+}
+
+type resErr struct {
+	*err
+}
+
+func (e *err) WithDetail(detail []byte, detailType int) *resErr {
+	e.detail = detail
+	e.t = detailType
+	return &resErr{e}
+}
+
+func (e *resErr) Error() string {
+	return e.e.Error()
+}
+
+func (e *resErr) SendError(ctx fiber.Ctx, status int) error {
+	if e.detail == nil {
+		return ctx.Status(status).Send([]byte(e.m))
+	}
+
+	if e.t == TDETAIL_JSON {
+		ctx.Set("Content-Type", "application/json")
+		return ctx.Status(status).Send(e.detail)
+	}
+
+	return ctx.Status(status).Send(e.detail)
 }

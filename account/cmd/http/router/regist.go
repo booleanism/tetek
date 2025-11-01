@@ -1,6 +1,8 @@
 package router
 
 import (
+	"encoding/json"
+
 	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -17,19 +19,24 @@ type registRequest struct {
 }
 
 type registResponse struct {
-	Detail registRequest `json:"detail"`
 	helper.GenericResponse
+	Detail registRequest `json:"detail"`
+}
+
+func (r registResponse) Json() []byte {
+	j, _ := json.Marshal(r)
+	return j
 }
 
 func Regist(rec recipes.RegistRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		loggr.Log.V(4).Info("new incoming regist request")
 		req := registRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.FromError(res.Code, ctx.Status(fiber.StatusBadRequest).JSON(&res))
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind request", "body", ctx.Body())
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
 		err := rec.Regist(ctx, model.User{
@@ -39,11 +46,9 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 		})
 
 		if err == nil {
-			res := registResponse{
-				GenericResponse: helper.GenericResponse{
-					Code:    errro.SUCCESS,
-					Message: "register success",
-				},
+			res := helper.GenericResponse{
+				Code:    errro.SUCCESS,
+				Message: "register success",
 			}
 			loggr.Log.V(4).Info("success registering user", "response", res)
 			return ctx.Status(fiber.StatusOK).JSON(&res)
@@ -57,7 +62,7 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				},
 				Detail: req,
 			}
-			return ctx.Status(fiber.StatusConflict).JSON(&res)
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusConflict)
 		}
 
 		if err.Code() == errro.EACCOUNT_INVALID_REGIST_PARAM {
@@ -68,7 +73,7 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				},
 				Detail: req,
 			}
-			return ctx.Status(fiber.StatusBadRequest).JSON(&res)
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		res := registResponse{
@@ -78,6 +83,6 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 			},
 			Detail: req,
 		}
-		return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
+		return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

@@ -11,44 +11,45 @@ import (
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 type deleteRequest struct {
-	Id string `json:"id"`
+	Id uuid.UUID `uri:"id"`
 }
 
 type deleteResponse struct {
-	Code    int           `json:"code"`
-	Message string        `json:"message"`
-	Detail  deleteRequest `json:"detail"`
+	helper.GenericResponse
+	Detail deleteRequest `json:"detail"`
 }
 
 func Delete(rec recipes.FeedRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		loggr.Log.V(4).Info("new incoming delete request")
 		req := deleteRequest{}
-		if res, err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-				z.Error(err, res.Message)
-				return errro.New(res.Code, res.Message)
-			}).ToFiber()
+		if err := helper.BindRequest(ctx, &req); err != nil {
+			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+				z.Error(err, "failed to bind request")
+				return err.SendError(ctx, fiber.StatusBadRequest)
+			})
 		}
 
-		jwt, ok := ctx.Locals("jwt").(*amqp.AuthResult)
+		j := ctx.Locals("jwt")
+		jwt, ok := j.(*amqp.AuthResult)
 		if !ok {
-			res := newFeedResponse{
-				Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
-				Message: "does not represent jwt type",
-			}
-			return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
-				e := errro.FromError(res.Code, ctx.Status(fiber.StatusInternalServerError).JSON(&res))
-				z.Error(e, res.Message)
-				return e
-			}).ToFiber()
+			return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
+				res := helper.GenericResponse{
+					Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
+					Message: "does not represent jwt type",
+				}
+				e := errro.New(res.Code, "failed to cast into AuthResult").WithDetail(res.Json(), errro.TDETAIL_JSON)
+				z.Error(e, res.Message, "type", j)
+				return e.SendError(ctx, fiber.StatusInternalServerError)
+			})
 		}
 
 		ff := repo.FeedsFilter{
-			Id: req.Id,
+			Id: req.Id.String(),
 		}
 
 		// only moderator freely to delete feed
@@ -60,15 +61,17 @@ func Delete(rec recipes.FeedRecipes) fiber.Handler {
 		err := rec.Delete(ctx, ff, jwt)
 		if err == nil {
 			res := deleteResponse{
-				Code:    errro.SUCCESS,
-				Message: "feed deleted",
-				Detail:  req,
+				GenericResponse: helper.GenericResponse{
+					Code:    errro.SUCCESS,
+					Message: "feed deleted",
+				},
+				Detail: req,
 			}
 			return ctx.Status(fiber.StatusOK).JSON(&res)
 		}
 
 		if err.Code() == errro.EFEEDS_NO_FEEDS && ff.By != "" {
-			res := deleteResponse{
+			res := helper.GenericResponse{
 				Code:    errro.EFEEDS_DELETE_FAIL,
 				Message: "unauthorized user or there is no such feed",
 			}
@@ -76,14 +79,14 @@ func Delete(rec recipes.FeedRecipes) fiber.Handler {
 		}
 
 		if err.Code() == errro.EFEEDS_NO_FEEDS {
-			res := deleteResponse{
+			res := helper.GenericResponse{
 				Code:    errro.EFEEDS_DELETE_FAIL,
 				Message: err.Error(),
 			}
 			return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
 		}
 
-		res := deleteResponse{
+		res := helper.GenericResponse{
 			Code:    err.Code(),
 			Message: err.Error(),
 		}
