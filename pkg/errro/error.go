@@ -15,6 +15,7 @@ type Error interface {
 
 type ResError interface {
 	error
+	Code() int
 	SendError(fiber.Ctx, int) error
 }
 
@@ -109,4 +110,8 @@ func (e *resErr) SendError(ctx fiber.Ctx, status int) error {
 	}
 
 	return ctx.Status(status).Send(e.detail)
+}
+
+func (e *resErr) Code() int {
+	return e.c
 }

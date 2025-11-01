@@ -5,7 +5,6 @@ import (
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/internal/repo"
-	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
@@ -23,73 +22,71 @@ type deleteResponse struct {
 	Detail deleteRequest `json:"detail"`
 }
 
-func Delete(rec recipes.FeedRecipes) fiber.Handler {
-	return func(ctx fiber.Ctx) error {
-		loggr.Log.V(4).Info("new incoming delete request")
-		req := deleteRequest{}
-		if err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
-				z.Error(err, "failed to bind request")
-				return err.SendError(ctx, fiber.StatusBadRequest)
-			})
-		}
+func (fr *FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
+	loggr.Log.V(4).Info("new incoming delete request")
+	req := deleteRequest{}
+	if err := helper.BindRequest(ctx, &req); err != nil {
+		return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
+			z.Error(err, "failed to bind request")
+			return err.SendError(ctx, fiber.StatusBadRequest)
+		})
+	}
 
-		j := ctx.Locals("jwt")
-		jwt, ok := j.(*amqp.AuthResult)
-		if !ok {
-			return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
-				res := helper.GenericResponse{
-					Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
-					Message: "does not represent jwt type",
-				}
-				e := errro.New(res.Code, "failed to cast into AuthResult").WithDetail(res.Json(), errro.TDETAIL_JSON)
-				z.Error(e, res.Message, "type", j)
-				return e.SendError(ctx, fiber.StatusInternalServerError)
-			})
-		}
-
-		ff := repo.FeedsFilter{
-			Id: req.Id.String(),
-		}
-
-		// only moderator freely to delete feed
-		if strings.ToLower(jwt.Claims.Role) != "m" {
-			loggr.Log.V(4).Info("normal user not moderator")
-			ff.By = jwt.Claims.Uname
-		}
-
-		err := rec.Delete(ctx, ff, jwt)
-		if err == nil {
-			res := deleteResponse{
-				GenericResponse: helper.GenericResponse{
-					Code:    errro.SUCCESS,
-					Message: "feed deleted",
-				},
-				Detail: req,
-			}
-			return ctx.Status(fiber.StatusOK).JSON(&res)
-		}
-
-		if err.Code() == errro.EFEEDS_NO_FEEDS && ff.By != "" {
+	j := ctx.Locals("jwt")
+	jwt, ok := j.(*amqp.AuthResult)
+	if !ok {
+		return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
 			res := helper.GenericResponse{
-				Code:    errro.EFEEDS_DELETE_FAIL,
-				Message: "unauthorized user or there is no such feed",
+				Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
+				Message: "missing jwt",
 			}
-			return ctx.Status(fiber.StatusUnauthorized).JSON(&res)
-		}
+			e := errro.New(res.Code, "does not represent jwt type").WithDetail(res.Json(), errro.TDETAIL_JSON)
+			z.Error(e, res.Message, "type", j)
+			return e.SendError(ctx, fiber.StatusInternalServerError)
+		})
+	}
 
-		if err.Code() == errro.EFEEDS_NO_FEEDS {
-			res := helper.GenericResponse{
-				Code:    errro.EFEEDS_DELETE_FAIL,
-				Message: err.Error(),
-			}
-			return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
-		}
+	ff := repo.FeedsFilter{
+		Id: req.Id.String(),
+	}
 
+	// only moderator freely to delete feed
+	if strings.ToLower(jwt.Claims.Role) != "m" {
+		loggr.Log.V(4).Info("normal user not moderator")
+		ff.By = jwt.Claims.Uname
+	}
+
+	err := fr.rec.Delete(ctx, ff, jwt)
+	if err == nil {
+		res := deleteResponse{
+			GenericResponse: helper.GenericResponse{
+				Code:    errro.SUCCESS,
+				Message: "feed deleted",
+			},
+			Detail: req,
+		}
+		return ctx.Status(fiber.StatusOK).JSON(&res)
+	}
+
+	if err.Code() == errro.EFEEDS_NO_FEEDS && ff.By != "" {
 		res := helper.GenericResponse{
-			Code:    err.Code(),
+			Code:    errro.EFEEDS_DELETE_FAIL,
+			Message: "unauthorized user or there is no such feed",
+		}
+		return ctx.Status(fiber.StatusUnauthorized).JSON(&res)
+	}
+
+	if err.Code() == errro.EFEEDS_NO_FEEDS {
+		res := helper.GenericResponse{
+			Code:    errro.EFEEDS_DELETE_FAIL,
 			Message: err.Error(),
 		}
-		return ctx.Status(fiber.StatusNotModified).JSON(&res)
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
 	}
+
+	res := helper.GenericResponse{
+		Code:    err.Code(),
+		Message: err.Error(),
+	}
+	return ctx.Status(fiber.StatusNotModified).JSON(&res)
 }

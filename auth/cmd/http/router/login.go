@@ -2,6 +2,7 @@ package router
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/booleanism/tetek/account/amqp"
 	"github.com/booleanism/tetek/auth/recipes"
@@ -21,7 +22,6 @@ type loginRequest struct {
 type loginResponse struct {
 	Code    int          `json:"code"`
 	Message string       `json:"message"`
-	Jwt     string       `json:"jwt"`
 	Detail  loginRequest `json:"detail"`
 }
 
@@ -54,12 +54,13 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 			res := loginResponse{
 				Code:    errro.SUCCESS,
 				Message: "login success",
-				Jwt:     jwt,
 				Detail: loginRequest{
 					Uname: req.Uname,
+					Email: req.Email,
 				},
 			}
 			loggr.Log.V(4).Info(res.Message)
+			ctx.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 			return ctx.Status(fiber.StatusOK).JSONP(res)
 		}
 

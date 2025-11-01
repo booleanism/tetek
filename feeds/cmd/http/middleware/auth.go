@@ -79,7 +79,7 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 				Code:    er.Code(),
 				Message: er.Error(),
 			}
-			return ctx.Status(fiber.StatusBadRequest).JSON(&res)
+			return er.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		if err := actualAuth(ctx, auth, jwt); err != nil {
@@ -101,7 +101,7 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 		return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
 			e := errro.New(res.Code, res.Message)
 			z.Error(err, res.Message, "id", id, "task", task)
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusServiceUnavailable)
 		})
 	}
 
@@ -111,10 +111,10 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
 			Message: "auth service unavailable: consuming auth result",
 		}
-		return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+		return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
 			e := errro.New(res.Code, res.Message)
 			z.Error(err, res.Message, "id", id, "task sent", task)
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusServiceUnavailable)
 		})
 	}
 
@@ -128,9 +128,9 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 		Code:    errro.EAUTH_JWT_VERIFY_FAIL,
 		Message: "authorization failed",
 	}
-	return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
+	return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
 		e := errro.New(res.Code, res.Message)
 		z.Info(2, "authorization failed", "id", id, "task", task, "auth result", authRes)
-		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
 	})
 }

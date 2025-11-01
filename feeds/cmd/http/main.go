@@ -41,13 +41,15 @@ func main() {
 	auth := contract.NewAuth(mqCon)
 	rec := recipes.NewRecipes(repo, acc)
 
+	router := router.NewFeedRouter(rec)
+
 	app := fiber.New()
 	api := app.Group("/api/v0")
 	{
-		api.Get("/", middleware.OptionalAuth(auth), router.Feeds(rec))
-		api.Post("/", middleware.Auth(auth), middleware.Feeds(rec), router.New(rec))
-		api.Delete("/:id<guid>", middleware.Feeds(rec), router.Delete(rec))
-		api.Put("/hide", middleware.Feeds(rec), router.Hide(rec))
+		api.Get("/", middleware.OptionalAuth(auth), router.GetFeeds)
+		api.Post("/", middleware.Auth(auth), router.NewFeed)
+		api.Delete("/:id<guid>", middleware.Auth(auth), router.DeleteFeed)
+		api.Put("/hide", middleware.Auth(auth), router.HideFeed)
 	}
 
 	app.Listen(":8083")

@@ -171,7 +171,11 @@ func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAut
 
 	_, er := fr.repo.HideFeed(ctx, hf)
 	if er != nil {
-		return errro.New(errro.EFEEDS_DB_ERR, "unable to hide feed")
+		return loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+			e := errro.New(errro.EFEEDS_DB_ERR, "unable to hide feed")
+			z.Error(er, e.Error())
+			return e
+		})
 	}
 
 	return nil

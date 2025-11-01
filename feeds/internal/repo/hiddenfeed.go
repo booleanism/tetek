@@ -21,7 +21,7 @@ func (r *feedsRepo) HideFeed(ctx context.Context, hf HiddenFeeds) (HiddenFeeds, 
 	err = q.QueryRow(
 		ctx, "INSERT INTO hiddenfeeds (id, to_uname, feed) VALUES ($1, $2, $3) RETURNING id, to_uname, feed",
 		hf.Id, hf.To, hf.FeedId,
-	).Scan(&f.Id, &f.To, f.FeedId)
+	).Scan(&f.Id, &f.To, &f.FeedId)
 
 	return f, err
 }
