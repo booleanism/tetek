@@ -2,12 +2,14 @@ package repo
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 type HiddenFeeds struct {
-	Id     string `json:"id"`
-	To     string `json:"to"`
-	FeedId string `json:"feed_id"`
+	Id     string    `json:"id"`
+	To     string    `json:"to"`
+	FeedId uuid.UUID `json:"feed_id"`
 }
 
 func (r *feedsRepo) HideFeed(ctx context.Context, hf HiddenFeeds) (HiddenFeeds, error) {

@@ -105,7 +105,7 @@ func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.Au
 }
 
 func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
-	if ff.Id == "" {
+	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" {
 		return loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
 			e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
 			z.Error(e, "missing id", "filter", ff)
@@ -153,7 +153,7 @@ func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqA
 }
 
 func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
-	if ff.Id == "" || ff.HiddenTo == "" {
+	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" || ff.HiddenTo == "" {
 		return errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "either id or hiddento should not empty")
 	}
 

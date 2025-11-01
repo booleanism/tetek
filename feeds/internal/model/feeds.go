@@ -1,9 +1,13 @@
 package model
 
-import "time"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 type Feed struct {
-	Id         string     `json:"id"`
+	Id         uuid.UUID  `json:"id"`
 	Title      string     `json:"title"`
 	Url        string     `json:"url"`
 	Text       string     `json:"text"`

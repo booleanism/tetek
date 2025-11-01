@@ -28,7 +28,7 @@ type newFeedResponse struct {
 func (fr newFeedRequest) ToFeed() model.Feed {
 	now := time.Now()
 	return model.Feed{
-		Id:         uuid.NewString(),
+		Id:         uuid.New(),
 		Title:      fr.Title,
 		Url:        fr.Url,
 		Text:       fr.Text,

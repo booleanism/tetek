@@ -12,11 +12,13 @@ import (
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 type getFeedsRequest struct {
-	Offset int    `query:"offset"`
-	Type   string `query:"type"` // M, J, A, S
+	Id     uuid.UUID `query:"id"`
+	Offset int       `query:"offset"`
+	Type   string    `query:"type"` // M, J, A, S
 }
 
 type getFeedsResponse struct {
@@ -55,6 +57,7 @@ func (fr *FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 	filter := repo.FeedsFilter{
 		Offset: uint64(req.Offset),
 		Type:   req.Type,
+		Id:     req.Id,
 	}
 
 	f, err := fr.rec.Feeds(ctx, filter, jwt)

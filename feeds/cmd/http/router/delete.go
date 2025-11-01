@@ -47,7 +47,7 @@ func (fr *FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 	}
 
 	ff := repo.FeedsFilter{
-		Id: req.Id.String(),
+		Id: req.Id,
 	}
 
 	// only moderator freely to delete feed

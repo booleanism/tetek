@@ -6,17 +6,18 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type FeedsFilter struct {
-	Type     string `json:"type"`
-	Order    int    `json:"order"` // 0: by points, 1: newest, 2: oldest
-	Id       string `json:"id"`
-	Offset   uint64 `json:"offset"`
-	By       string `json:"by"`
-	HiddenTo string `json:"hidden_to"`
+	Type     string    `json:"type"`
+	Order    int       `json:"order"` // 0: by points, 1: newest, 2: oldest
+	Id       uuid.UUID `json:"id"`
+	Offset   uint64    `json:"offset"`
+	By       string    `json:"by"`
+	HiddenTo string    `json:"hidden_to"`
 }
 
 const limit = 30
@@ -52,6 +53,10 @@ func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter) ([]model.Feed, er
 	if ff.HiddenTo != "" {
 		base = base.LeftJoin("hiddenfeeds hf on f.id = hf.feed AND hf.to_uname = ?", ff.HiddenTo)
 		pred["hf.id"] = nil
+	}
+
+	if ff.Id.String() != "00000000-0000-0000-0000-000000000000" {
+		pred["f.id"] = ff.Id
 	}
 
 	base = base.Where(pred)

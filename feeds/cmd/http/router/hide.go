@@ -44,7 +44,7 @@ func (fr *FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 	}
 
 	ff := repo.FeedsFilter{
-		Id:       req.Id.String(),
+		Id:       req.Id,
 		HiddenTo: jwt.Claims.Uname,
 	}
 
