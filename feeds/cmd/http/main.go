@@ -7,7 +7,6 @@ import (
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/cmd/http/router"
-	"github.com/booleanism/tetek/feeds/cmd/http/router/feeds"
 	"github.com/booleanism/tetek/feeds/internal/contract"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
@@ -46,9 +45,9 @@ func main() {
 	api := app.Group("/api/v0")
 	{
 		api.Get("/", middleware.OptionalAuth(auth), router.Feeds(rec))
-		api.Post("/", middleware.Auth(auth), middleware.Feeds(rec), feeds.New(rec))
-		api.Delete("/:id<guid>", middleware.Feeds(rec), feeds.Delete(rec))
-		api.Put("/hide", middleware.Feeds(rec), feeds.Hide(rec))
+		api.Post("/", middleware.Auth(auth), middleware.Feeds(rec), router.New(rec))
+		api.Delete("/:id<guid>", middleware.Feeds(rec), router.Delete(rec))
+		api.Put("/hide", middleware.Feeds(rec), router.Hide(rec))
 	}
 
 	app.Listen(":8083")

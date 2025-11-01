@@ -1,4 +1,4 @@
-package feeds
+package router
 
 import (
 	"github.com/booleanism/tetek/auth/amqp"
