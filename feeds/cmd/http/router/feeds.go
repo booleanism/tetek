@@ -26,7 +26,7 @@ type getFeedsResponse struct {
 	Detail []model.Feed `json:"detail"`
 }
 
-func (r *getFeedsResponse) Json() []byte {
+func (r getFeedsResponse) Json() []byte {
 	j, _ := json.Marshal(r)
 	return j
 }
@@ -35,11 +35,11 @@ type FeedsRouter struct {
 	rec recipes.FeedRecipes
 }
 
-func NewFeedRouter(rec recipes.FeedRecipes) *FeedsRouter {
-	return &FeedsRouter{rec}
+func NewFeedRouter(rec recipes.FeedRecipes) FeedsRouter {
+	return FeedsRouter{rec}
 }
 
-func (fr *FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
+func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 	loggr.Log.V(4).Info("new incomming feeds request")
 	if ctx.IsMiddleware() {
 		return ctx.Next()

@@ -22,7 +22,7 @@ type deleteResponse struct {
 	Detail deleteRequest `json:"detail"`
 }
 
-func (fr *FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
+func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 	loggr.Log.V(4).Info("new incoming delete request")
 	req := deleteRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {

@@ -20,7 +20,7 @@ type hideResponse struct {
 	Detail hideRequest `json:"detail"`
 }
 
-func (fr *FeedsRouter) HideFeed(ctx fiber.Ctx) error {
+func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 	loggr.Log.V(4).Info("new incoming hide request")
 	req := hideRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {

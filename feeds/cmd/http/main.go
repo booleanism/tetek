@@ -36,7 +36,7 @@ func main() {
 	}
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
-	repo := repo.New(dbPool, &sq)
+	repo := repo.New(dbPool, sq)
 	acc := contract.NewAccount(mqCon)
 	auth := contract.NewAuth(mqCon)
 	rec := recipes.NewRecipes(repo, acc)
@@ -47,8 +47,11 @@ func main() {
 	api := app.Group("/api/v0")
 	{
 		api.Get("/", middleware.OptionalAuth(auth), router.GetFeeds)
+		// TODO: to use Location header fills with created feeds id and return with 201 code
 		api.Post("/", middleware.Auth(auth), router.NewFeed)
+		// TODO: Idempotencies, consistent response if the request is identical
 		api.Delete("/:id<guid>", middleware.Auth(auth), router.DeleteFeed)
+		// TODO: Idempotencies, consistent response if the request is identical
 		api.Put("/hide", middleware.Auth(auth), router.HideFeed)
 	}
 

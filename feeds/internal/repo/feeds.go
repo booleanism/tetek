@@ -31,10 +31,10 @@ type FeedsRepo interface {
 
 type feedsRepo struct {
 	pool *pgxpool.Pool
-	sq   *squirrel.StatementBuilderType
+	sq   squirrel.StatementBuilderType
 }
 
-func New(pool *pgxpool.Pool, sq *squirrel.StatementBuilderType) *feedsRepo {
+func New(pool *pgxpool.Pool, sq squirrel.StatementBuilderType) *feedsRepo {
 	return &feedsRepo{pool, sq}
 }
 

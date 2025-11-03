@@ -39,7 +39,7 @@ func (fr newFeedRequest) ToFeed() model.Feed {
 	}
 }
 
-func (fr *FeedsRouter) NewFeed(ctx fiber.Ctx) error {
+func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
 	loggr.Log.V(4).Info("new incoming feed request")
 	req := newFeedRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {

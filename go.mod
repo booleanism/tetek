@@ -4,6 +4,7 @@ go 1.25.3
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
+	github.com/booleanism/huma/v2 v2.34.1-p2
 	github.com/go-logr/logr v1.2.3
 	github.com/go-logr/zerologr v1.2.3
 	github.com/gofiber/fiber/v3 v3.0.0-rc.2
