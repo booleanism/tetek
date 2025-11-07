@@ -13,10 +13,10 @@ type logger struct {
 	zerologr.Logger
 }
 
-var Log logger
+var log logger
 
 func Register(lev int) {
-	Log = newLog(lev)
+	log = newLog(lev)
 }
 
 func newLog(maxLevel int) logger {
@@ -26,10 +26,50 @@ func newLog(maxLevel int) logger {
 	return logger{zerologr.New(&zl)}
 }
 
-func (l logger) Error(v int, log func(z logr.LogSink) errro.Error) errro.Error {
-	return log(Log.WithCallDepth(1).V(v).GetSink())
+type logErr interface {
+	Error(err error, msg string, keysAndValues ...any)
 }
 
-func (l logger) ErrorRes(v int, log func(z logr.LogSink) error) error {
-	return log(Log.WithCallDepth(1).V(v).GetSink())
+type logInfo interface {
+	Info(msg string, keysAndValues ...any)
+}
+
+type LogErr interface {
+	V(level int) logErr
+}
+
+type LogInf interface {
+	V(level int) logInfo
+}
+
+type logErrAdapter struct {
+	l logr.Logger
+}
+
+func (l logErrAdapter) V(v int) logErr {
+	return l.l.V(v)
+}
+
+type logInfoAdapter struct {
+	l logr.Logger
+}
+
+func (l logInfoAdapter) V(v int) logInfo {
+	return l.l.V(v)
+}
+
+func LogError(logFn func(z LogErr) errro.Error) errro.Error {
+	return logFn(logErrAdapter{log.Logger})
+}
+
+func LogInfo(logFn func(z LogInf)) {
+	logFn(logInfoAdapter{log.Logger.WithCallDepth(2)})
+}
+
+func LogRes(logFn func(z LogErr) errro.ResError) errro.ResError {
+	return LogResWithDepth(2, logFn)
+}
+
+func LogResWithDepth(depth int, logFn func(z LogErr) errro.ResError) errro.ResError {
+	return logFn(logErrAdapter{log.WithCallDepth(depth)})
 }

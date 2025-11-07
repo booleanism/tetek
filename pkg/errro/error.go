@@ -2,6 +2,7 @@ package errro
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/gofiber/fiber/v3"
 )
@@ -33,7 +34,7 @@ const (
 )
 
 const SUCCESS = 0
-const INVALID_REQ = 3
+const INVALID_REQ = EACCOUNT_PARSE_FAIL
 
 const (
 	EAUTH_JWT_GENERATAION_FAIL     = -7
@@ -78,7 +79,7 @@ func FromError(code int, msg string, e error) *err {
 }
 
 func (e *err) Error() string {
-	return e.m
+	return fmt.Sprintf("%s: %s", e.m, e.e.Error())
 }
 
 func (e *err) Code() int {
@@ -96,7 +97,7 @@ func (e *err) WithDetail(detail []byte, detailType int) *resErr {
 }
 
 func (e *resErr) Error() string {
-	return e.e.Error()
+	return fmt.Sprintf("%s: %s", e.m, e.e.Error())
 }
 
 func (e *resErr) SendError(ctx fiber.Ctx, status int) error {

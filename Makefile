@@ -17,3 +17,8 @@ run-worker-account:
 run-worker-auth:
 	BROKER_STR=${BROKER_STR} AUTH_JWT_SECRET=${AUTH_JWT_SECRET} go run auth/cmd/worker/main.go
 
+docs-feeds:
+	oapi-codegen -config feeds/cmd/http/api/config.yaml docs/api/v0/feeds.yaml
+
+docs-comments:
+	oapi-codegen -config comments/cmd/http/api/config.yaml docs/api/v0/comments.yaml

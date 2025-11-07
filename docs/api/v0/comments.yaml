@@ -1,0 +1,245 @@
+openapi: "3.0.0"
+info:
+  version: 0.0.0
+  title: Tetek Comments Service
+  description: |
+    An HTTP REST API documentation about Comments Service. It's work recursively. 
+    What it means recursively that is backend can receive ID of a feed or a comment.
+    It used to construct comments tree and flexiblelity.
+  termsOfService: https://swagger.io/terms/
+  contact:
+    name: Mambaul Hisam
+    email: me@ulhism.id
+    url: https://ulhism.id
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: http://0.0.0.0:8083/api/v0
+paths:
+  /{id}:
+    post:
+      security:
+        - bearerAuth: []
+      summary: API for posting reply to a Feed.
+      operationId: newComment
+      parameters:
+        - name: id
+          in: path
+          description: Id of the parents. See, info description in the begining this docs.
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        description: The minimal representation of feed comment.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewCommentReq'
+      responses:
+        '201':
+          description: Successful reply to a Feed response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NewCommentRes"
+        '400':
+          description: Malformat user request. If you get this status, make sure the request query were valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '401':
+          description: Unauthorized user, cannot perform this action.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRes"
+        '500':
+          description: Well know error in our backend.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRes"
+        default:
+          description: Unexpected error, please contact support if you receive this response.
+          content:
+            text/plain:
+              type: string
+    get:
+      security:
+        - bearerAuth: []
+        - {}
+      summary: API for fetching comments and it's tree. The ID as it's head.
+      operationId: getComments
+      parameters:
+        - name: id
+          in: path
+          description: ID of the Feed or Comment.
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Success fetching comments.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GetCommentsRes"
+        '400':
+          description: Malformat user request. If you get this status, make sure the request were valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '404':
+          description: The given ID of Comments or Feeds wasn't found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '500':
+          description: Well know error in our backend.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRes"
+        default:
+          description: Unexpected error, please contact support if you receive this response.
+          content:
+            text/plain:
+              type: string
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete a Comment
+      operationId: deleteComment
+      description: |
+        This API does not really delete a comment. Instead it's do soft delete it. Same behavior as deleteFeed operation.
+        BUT, you know it's a tree, if it despair completely any child of this comment also despair because of missing path between comments and it's child.
+        To overcome this issue, it will shows the comment as `[deleted]` instead. This behavior same as modifying a comment as `[deleted]`
+      parameters:
+        - name: id
+          in: path
+          description: ID of comments
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: Successful comment deletion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteCommentRes"
+        '400':
+          description: Malformat user request. If you get this status, make sure the request were valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '404':
+          description: The given ID of Comments wasn't found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '500':
+          description: Well know error in our backend.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenericRes"
+        default:
+          description: Unexpected error, please contact support if you receive this response.
+          content:
+            text/plain:
+              type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    GenericRes:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: |
+            Represent return result code of request. If it was negative, error happen at server side and mostly with 5xx status code.
+            If it was positive, you are the error. Either, success.
+        message:
+          type: string
+          description: This explain what's going on within result code.
+      required:
+        - code
+        - message
+    NewCommentReq:
+      type: object
+      required:
+        - parent
+        - text
+      properties:
+        parent:
+          type: string
+          format: uuid
+          description: The ID where you are commenting about. If successful, it should appers as child of that ID. 
+        text:
+          type: string
+          description: Comment text.
+    NewCommentRes:
+      allOf:
+        - $ref: "#/components/schemas/GenericRes"
+        - type: object
+          required:
+            - detail
+          properties:
+            detail:
+              schema:
+                $ref: "#/components/schemas/Comment"
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        parent:
+          type: string
+          format: uuid
+        by:
+          type: string
+        text:
+          type: string
+        created_at:
+          type: string
+          format: date
+      required:
+        - id
+        - parent
+        - by
+        - text
+        - created_at
+    GetCommentsRes:
+      allOf:
+        - $ref: "#/components/schemas/GenericRes"
+        - type: object
+          details:
+            type: array
+            items:
+              $ref: "#/components/schemas/Feed"
+    DeleteCommentRes:
+      allOf:
+        - $ref: "#/components/schemas/GenericRes"
+        - type: object
+          required:
+            - detail
+          properties:
+            detail:
+              schema:
+                - $ref: "#/components/schemas/Comment"

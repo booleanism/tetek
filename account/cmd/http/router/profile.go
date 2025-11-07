@@ -8,7 +8,6 @@ import (
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -28,13 +27,15 @@ func (r profileResponse) Json() []byte {
 
 func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		loggr.Log.V(4).Info("new incoming profile request")
+		loggr.LogInfo(func(z loggr.LogInf) {
+			z.V(4).Info("new incoming profile request")
+		})
 		req := profileRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
-				z.Error(err, "failed to bind request", "uri", ctx.OriginalURL())
-				return err.SendError(ctx, fiber.StatusBadRequest)
-			})
+			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
+				z.V(3).Error(err, "failed to bind request", "uri", ctx.OriginalURL())
+				return err
+			}).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		if req.Uname == "" {
@@ -42,12 +43,11 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 				Code:    errro.EACCOUNT_EMPTY_PARAM,
 				Message: "uname empty",
 			}
-			loggr.Log.V(2).Info("invalid param", "param", req.Uname, "response", res)
-			return loggr.Log.ErrorRes(4, func(z logr.LogSink) error {
+			loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 				e := errro.New(res.Code, res.Message)
-				z.Error(e, "uname parameter should not empty")
-				return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
-			})
+				z.V(4).Error(e, "uname parameter should not empty")
+				return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+			}).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		u, err := rec.Profile(ctx.Context(), model.User{Uname: req.Uname})
@@ -80,7 +80,9 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 			},
 			Detail: u,
 		}
-		loggr.Log.V(4).Info("request success", "response", u)
+		loggr.LogInfo(func(z loggr.LogInf) {
+			z.V(4).Info("request success", "response", u)
+		})
 		return ctx.Status(fiber.StatusOK).JSON(res)
 	}
 }

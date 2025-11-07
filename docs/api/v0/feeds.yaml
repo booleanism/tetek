@@ -1,0 +1,254 @@
+openapi: "3.0.0"
+info:
+  version: 0.0.0
+  title: Tetek Feeds Service
+  description: An HTTP REST API documentation about Feeds Service.
+  termsOfService: https://swagger.io/terms/
+  contact:
+    name: Mambaul Hisam
+    email: me@ulhism.id
+    url: https://ulhism.id
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: http://0.0.0.0:8083/api/v0
+paths:
+  /:
+    get:
+      security:
+        - bearerAuth: []
+        - {}
+      summary: Get feed(s)
+      description: |
+        Return feed(s) by given parameter. 
+        If Authorization header provided and valid, it would return personalized feeds. Either, you are a guest and won't personalized.
+      operationId: getFeeds
+      parameters:
+        - name: type
+          in: query
+          description: The type of feed, either m (main), a (ask), j (job), s (show).
+          required: true
+          schema:
+            type: string
+            enum: [m, a, j, s]
+        - name: id
+          in: query
+          description: ID of the feed.
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: offset
+          in: query
+          description: |
+            The offset of the feeds, multiplied by 30. If you pass 1, it would return feeds range of 31-60. Default: 0.
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Get feeds successful response. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetFeedsRes'
+        '400':
+          description: Malformat user request. If you get this status, make sure the request query are valid.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '404':
+          description: This status happen if there is no such feed by given queries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '500':
+          description: Well know error, need internal further action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        default:
+          description: Unexpected error
+          content:
+            text/plain:
+              schema:
+                type: string
+    post:
+      security:
+        - bearerAuth: []
+      summary: Creates new feed
+      description: This API would creates a feed.
+      operationId: newFeed
+      requestBody:
+        description: The minimal representation of feed.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NewFeedReq'
+      responses:
+        '201':
+          description: Indicate successful feed creation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NewFeedRes'
+        '401':
+          description: If JWT invalid. It would return.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '500':
+          description: Well know error, need internal further action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        default:
+          description: Unexpected error
+          content:
+            text/plain:
+              schema:
+                type: string
+  /{id}:
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete a feed
+      description: Delete the requested feed by given ID.
+      operationId: deleteFeed
+      parameters:
+        - name: id
+          in: path
+          description: ID of feed to delete.
+          required: true
+          schema: 
+            type: string
+            format: uuid
+      responses:
+        '202':
+          description: The requested feed soft deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteRes'
+        '204':
+          description: Feed already deleted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteRes'
+        '401':
+          description: If JWT invalid. It would return.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        '500':
+          description: Well know error, need internal further action.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GenericRes'
+        default:
+          description: Unexpected error
+          content:
+            text/plain:
+              schema:
+                type: string
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    GenericRes:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: |
+            Represent return result code of request. If it was negative, error happen at server side and mostly with 5xx status code.
+            If it was positive, you are the error. Either, success.
+        message:
+          type: string
+          description: This explain what's going on within result code.
+      required:
+        - code
+        - message
+    Feed:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        url:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+          enum: [m, a, j, s]
+        points:
+          type: integer
+        n_comments:
+          type: integer
+        created_at:
+          type: string
+          format: date
+        deleted_at:
+          type: string
+          format: date
+    GetFeedsRes:
+      allOf:
+        - $ref: '#/components/schemas/GenericRes'
+        - type: object
+          required:
+            - detail
+          properties:
+            details:
+              type: array
+              description: Feed(s) representation.
+              items:
+                $ref: '#/components/schemas/Feed'
+    NewFeedReq:
+      type: object
+      properties:
+        title:
+          type: string
+        url:
+          type: string
+        text:
+          type: string
+        type:
+          type: string
+          enum: [m, a, j, s]
+      required:
+        - title
+        - type
+    NewFeedRes:
+      allOf:
+        - $ref: '#/components/schemas/GenericRes'
+        - type: object
+          properties:
+            detail:
+              type: object
+              $ref: '#/components/schemas/NewFeedReq'
+          allOf:
+            - $ref: '#/components/schemas/GenericRes'
+    DeleteRes:
+      allOf:
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+        - $ref: '#/components/schemas/GenericRes'

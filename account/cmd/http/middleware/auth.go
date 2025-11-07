@@ -8,7 +8,6 @@ import (
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -25,10 +24,10 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		req := authRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
-				z.Error(err, "failed to bind request", "header", ctx.GetHeaders())
-				return err.SendError(ctx, fiber.StatusBadRequest)
-			})
+			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
+				z.V(3).Error(err, "failed to bind request", "header", ctx.GetHeaders())
+				return err
+			}).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		if req.Authorization == "" {
@@ -38,11 +37,11 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 					Message: "missing authorization header",
 				},
 			}
-			return loggr.Log.ErrorRes(4, func(z logr.LogSink) error {
+			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 				e := errro.New(res.Code, res.Message)
-				z.Error(e, res.Message, "request", req)
-				return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
-			})
+				z.V(4).Error(e, res.Message, "request", req)
+				return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+			}).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		jwt, ok := strings.CutPrefix(req.Authorization, "Bearer ")
@@ -53,11 +52,11 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 					Message: "mismatch authorization mechanism",
 				},
 			}
-			return loggr.Log.ErrorRes(4, func(z logr.LogSink) error {
+			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 				e := errro.New(res.Code, res.Message)
-				z.Error(e, res.Message, "request", req)
+				z.V(4).Error(e, res.Message, "request", req)
 				return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
-			})
+			}).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		id := uuid.NewString()
@@ -69,11 +68,11 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 					Message: "auth service unavailable",
 				},
 			}
-			return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
+			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 				e := errro.New(res.Code, res.Message)
-				z.Error(err, "cannot publish auth task to auth service", "id", id, "task", task)
+				z.V(0).Error(err, "cannot publish auth task to auth service", "id", id, "task", task)
 				return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
-			})
+			}).SendError(ctx, fiber.StatusServiceUnavailable)
 		}
 
 		authRes, err := auth.Consume(id)
@@ -84,16 +83,18 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 					Message: "auth service unavailable",
 				},
 			}
-			return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
+			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 				e := errro.New(res.Code, res.Message)
-				z.Error(err, "cannot consume auth task to auth service", "id", id, "task", task)
+				z.V(0).Error(err, "cannot consume auth task to auth service", "id", id, "task", task)
 				return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 			})
 		}
 
 		if authRes.Code == errro.SUCCESS {
 			ctx.Locals("jwt", authRes)
-			loggr.Log.V(4).Info("authorization success. forwarded into next middleware")
+			loggr.LogInfo(func(z loggr.LogInf) {
+				z.V(4).Info("authorization success. forwarded into next middleware")
+			})
 			return ctx.Next()
 		}
 
@@ -103,10 +104,10 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 				Message: "authorization failed",
 			},
 		}
-		return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
+		return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 			e := errro.New(res.Code, res.Message)
-			z.Info(2, "authorization failed", "id", id, "auth result", authRes)
+			z.V(2).Error(e, "authorization failed", "id", id, "auth result", authRes)
 			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
-		})
+		}).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

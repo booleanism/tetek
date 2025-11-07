@@ -1,0 +1,8 @@
+package: api
+output: feeds/cmd/http/api/feeds.go
+generate:
+  fiber-server: true
+  models: true
+  client: true
+  # strict-server: true # experiment with this
+  embedded-spec: true

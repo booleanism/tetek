@@ -27,7 +27,9 @@ type AuthResult struct {
 }
 
 func AuthSetup(ch *amqp091.Channel) error {
-	loggr.Log.V(4).Info("setup auth service exchange and queue")
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("setup auth service exchange and queue")
+	})
 	err := ch.ExchangeDeclare(AUTH_EXCHANGE, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err

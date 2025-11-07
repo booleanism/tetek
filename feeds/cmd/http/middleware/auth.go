@@ -8,7 +8,6 @@ import (
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -35,20 +34,20 @@ func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 	req := authRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
-		return "", loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
-			z.Error(err, "failed to bind request", "header", ctx.GetHeaders())
+		return "", loggr.LogError(func(z loggr.LogErr) errro.Error {
+			z.V(4).Error(err, "failed to bind request", "header", ctx.GetHeaders())
 			return errro.New(errro.INVALID_REQ, err.Error())
 		})
 	}
 
 	if req.Authorization == "" {
-		return "", loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+		return "", loggr.LogError(func(z loggr.LogErr) errro.Error {
 			res := helper.GenericResponse{
 				Code:    errro.EAUTH_MISSING_HEADER,
 				Message: "missing authorization header",
 			}
 			e := errro.New(res.Code, res.Message)
-			z.Error(e, res.Message)
+			z.V(4).Error(e, res.Message)
 			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 		})
 	}
@@ -59,9 +58,9 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 			Code:    errro.EAUTH_MISSMATCH_AUTH_MECHANISM,
 			Message: "mismatch authorization mechanism",
 		}
-		return "", loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+		return "", loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(res.Code, res.Message)
-			z.Error(e, "mismatch authorization mechanism, expected Bearer")
+			z.V(4).Error(e, "mismatch authorization mechanism, expected Bearer")
 			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 		})
 	}
@@ -71,7 +70,9 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 
 func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		loggr.Log.V(4).Info("new incoming authorization request")
+		loggr.LogInfo(func(z loggr.LogInf) {
+			z.V(4).Info("new incoming authorization request")
+		})
 
 		jwt, er := checkJwt(ctx)
 		if er != nil {
@@ -83,14 +84,14 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 		}
 
 		if err := actualAuth(ctx, auth, jwt); err != nil {
-			return err
+			return err.SendError(ctx, fiber.StatusUnauthorized)
 		}
 
 		return ctx.Next()
 	}
 }
 
-func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error {
+func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) errro.ResError {
 	id := uuid.NewString()
 	task := amqp.AuthTask{Jwt: jwt}
 	if err := auth.Publish(id, task); err != nil {
@@ -98,10 +99,10 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
 			Message: "auth service unavailable: publishing auth task",
 		}
-		return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
+		return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 			e := errro.New(res.Code, res.Message)
-			z.Error(err, res.Message, "id", id, "task", task)
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusServiceUnavailable)
+			z.V(0).Error(err, res.Message, "id", id, "task", task)
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 		})
 	}
 
@@ -111,16 +112,18 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
 			Message: "auth service unavailable: consuming auth result",
 		}
-		return loggr.Log.ErrorRes(0, func(z logr.LogSink) error {
+		return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 			e := errro.New(res.Code, res.Message)
-			z.Error(err, res.Message, "id", id, "task sent", task)
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusServiceUnavailable)
+			z.V(0).Error(err, res.Message, "id", id, "task sent", task)
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 		})
 	}
 
 	if authRes.Code == errro.SUCCESS {
 		ctx.Locals("jwt", authRes)
-		loggr.Log.V(4).Info("authorization success. forwarded into next middleware")
+		loggr.LogInfo(func(z loggr.LogInf) {
+			z.V(4).Info("authorization success. forwarded into next middleware")
+		})
 		return nil
 	}
 
@@ -128,9 +131,9 @@ func actualAuth(ctx fiber.Ctx, auth *contract.LocalAuthContr, jwt string) error 
 		Code:    errro.EAUTH_JWT_VERIFY_FAIL,
 		Message: "authorization failed",
 	}
-	return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
+	return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 		e := errro.New(res.Code, res.Message)
-		z.Info(2, "authorization failed", "id", id, "task", task, "auth result", authRes)
-		return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
+		z.V(5).Error(err, "authorization failed", "id", id, "task", task, "auth result", authRes)
+		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	})
 }

@@ -37,16 +37,23 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 
 	go func() {
 		for d := range mgs {
-			loggr.Log.V(4).Info("receive new auth task", "id", d.CorrelationId, "body", d.Body)
+			loggr.LogInfo(func(z loggr.LogInf) {
+				z.V(4).Info("receive new auth task", "id", d.CorrelationId, "body", d.Body)
+			})
 			if d.ContentType != "text/json" {
-				loggr.Log.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
+				})
 				continue
 			}
 
 			task := amqp.AuthTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				loggr.Log.V(0).Error(err, "auth task parsing failed", "id", d.CorrelationId)
+				loggr.LogError(func(z loggr.LogErr) errro.Error {
+					z.V(0).Error(err, "auth task parsing failed", "id", d.CorrelationId)
+					return nil
+				})
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_PARSE_FAIL})
 				ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
@@ -59,7 +66,10 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 
 			claim, err := c.jwt.Verify(task.Jwt)
 			if err != nil {
-				loggr.Log.V(2).Error(err, "jwt verification failed", "id", d.CorrelationId, "jwt", task.Jwt)
+				loggr.LogError(func(z loggr.LogErr) errro.Error {
+					z.V(2).Error(err, "jwt verification failed", "id", d.CorrelationId, "jwt", task.Jwt)
+					return nil
+				})
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_JWT_VERIFY_FAIL, AuthTask: task})
 				ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
@@ -71,7 +81,9 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 			}
 
 			res, _ := json.Marshal(amqp.AuthResult{Code: errro.SUCCESS, AuthTask: task, Claims: *claim})
-			loggr.Log.V(4).Info("authorization success", "id", d.CorrelationId, "result", res)
+			loggr.LogInfo(func(z loggr.LogInf) {
+				z.V(4).Info("authorization success", "id", d.CorrelationId, "result", res)
+			})
 			ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 				CorrelationId: d.CorrelationId,
 				Body:          res,

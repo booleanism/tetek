@@ -1,6 +1,7 @@
 package router
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
@@ -8,7 +9,6 @@ import (
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -39,27 +39,34 @@ func (fr newFeedRequest) ToFeed() model.Feed {
 	}
 }
 
+func (fr newFeedResponse) Json() []byte {
+	j, _ := json.Marshal(fr)
+	return j
+}
+
 func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
-	loggr.Log.V(4).Info("new incoming feed request")
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("new incoming feed request")
+	})
 	req := newFeedRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
-		return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
-			z.Error(err, "failed to bind request", "body", ctx.Body())
-			return err.SendError(ctx, fiber.StatusBadRequest)
-		})
+		return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
+			z.V(4).Error(err, "failed to bind request", "body", ctx.Body())
+			return err
+		}).SendError(ctx, fiber.StatusBadRequest)
 	}
 
 	jwt, ok := ctx.Locals("jwt").(*amqp.AuthResult)
 	if !ok {
-		return loggr.Log.ErrorRes(2, func(z logr.LogSink) error {
+		return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
 			res := helper.GenericResponse{
 				Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
 				Message: "does not represent jwt type",
 			}
 			e := errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON)
-			z.Error(e, res.Message)
+			z.V(4).Error(e, res.Message)
 			return e
-		})
+		}).SendError(ctx, fiber.StatusUnauthorized)
 	}
 
 	f := req.ToFeed()
@@ -72,16 +79,22 @@ func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
 			},
 			Detail: req,
 		}
-		loggr.Log.V(4).Info("new feed added")
-		return ctx.Status(fiber.StatusOK).JSON(&res)
+		loggr.LogInfo(func(z loggr.LogInf) {
+			z.V(4).Info("new feed added")
+		})
+		return ctx.Status(fiber.StatusCreated).JSON(&res)
 	}
 
-	res := newFeedResponse{
-		GenericResponse: helper.GenericResponse{
-			Code:    errro.EFEEDS_NEW_FAIL,
-			Message: "failed to create new feed",
-		},
-		Detail: req,
-	}
-	return ctx.Status(fiber.StatusInternalServerError).JSON(&res)
+	return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
+		res := newFeedResponse{
+			GenericResponse: helper.GenericResponse{
+				Code:    errro.EFEEDS_NEW_FAIL,
+				Message: "failed to create new feed",
+			},
+			Detail: req,
+		}
+		e := errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON)
+		z.V(4).Error(e, res.Message)
+		return e
+	}).SendError(ctx, fiber.StatusInternalServerError)
 }

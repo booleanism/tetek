@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 
 	"github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/feeds/cmd/http/api"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -39,18 +39,20 @@ func NewFeedRouter(rec recipes.FeedRecipes) FeedsRouter {
 	return FeedsRouter{rec}
 }
 
-func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
-	loggr.Log.V(4).Info("new incomming feeds request")
+func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx, param api.GetFeedsParams) error {
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("new incomming feeds request")
+	})
 	if ctx.IsMiddleware() {
 		return ctx.Next()
 	}
 
 	req := getFeedsRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
-		return loggr.Log.ErrorRes(3, func(z logr.LogSink) error {
-			z.Error(err, "failed to bind")
-			return err.SendError(ctx, fiber.StatusBadRequest)
-		})
+		return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
+			z.V(4).Error(err, "failed to bind")
+			return err
+		}).SendError(ctx, fiber.StatusBadRequest)
 	}
 
 	jwt, _ := ctx.Locals("jwt").(*amqp.AuthResult)
@@ -69,7 +71,9 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 			},
 			Detail: f,
 		}
-		loggr.Log.V(4).Info(res.Message)
+		loggr.LogInfo(func(z loggr.LogInf) {
+			z.V(4).Info(res.Message)
+		})
 		return ctx.Status(fiber.StatusOK).JSON(&res)
 	}
 

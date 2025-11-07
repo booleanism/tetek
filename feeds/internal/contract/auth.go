@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -48,7 +49,9 @@ func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
 	}); err != nil {
 		return err
 	}
-	loggr.Log.V(4).Info("auth task sent", "id", corrId, "task", task)
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("auth task sent", "id", corrId, "task", task)
+	})
 
 	return nil
 }
@@ -67,7 +70,9 @@ func (c *LocalAuthContr) Consume(corrId string) (*amqp.AuthResult, error) {
 	delete(c.res, corrId)
 	close(ch)
 	c.mRes.Unlock()
-	loggr.Log.V(4).Info("auth result eaten", "id", corrId)
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("auth result eaten", "id", corrId)
+	})
 
 	return res, nil
 }
@@ -99,35 +104,45 @@ func (c *LocalAuthContr) authResListener() error {
 
 	go func() {
 		for d := range mgs {
-			loggr.Log.V(4).Info("receive new auth result", "id", d.CorrelationId)
+			loggr.LogInfo(func(z loggr.LogInf) {
+				z.V(4).Info("receive new auth result", "id", d.CorrelationId)
+			})
 			c.mRes.Lock()
 			respCh, ok := c.res[d.CorrelationId]
 			c.mRes.Unlock()
 
 			if !ok {
-				loggr.Log.V(4).Info("no waiting receiver for corrId, skipping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(4).Info("no waiting receiver for corrId, skipping", "id", d.CorrelationId)
+				})
 				d.Nack(false, false)
 				continue
 			}
 
 			if d.ContentType != "text/json" {
-				loggr.Log.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
+				})
 				continue
 			}
 
 			var res = amqp.AuthResult{}
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				loggr.Log.V(0).Error(err, "parsing auth result failed", "id", d.CorrelationId)
+				loggr.LogError(func(z loggr.LogErr) errro.Error {
+					z.V(0).Error(err, "parsing auth result failed", "id", d.CorrelationId)
+					return nil
+				})
 				d.Nack(false, false)
 				continue
 			}
 
 			select {
 			case respCh <- &res:
-				loggr.Log.V(4).Info("result sent", "id", d.CorrelationId)
 				d.Ack(false)
 			default:
-				loggr.Log.V(3).Info("receiver not ready, dropping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(3).Info("receiver not ready, dropping", "id", d.CorrelationId)
+				})
 				d.Nack(false, false)
 			}
 		}

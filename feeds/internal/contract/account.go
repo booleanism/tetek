@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/booleanism/tetek/account/amqp"
+	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -48,7 +49,9 @@ func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
 	}); err != nil {
 		return err
 	}
-	loggr.Log.V(4).Info("account task sent", "id", corrId, "task", task)
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("account task sent", "id", corrId, "task", task)
+	})
 
 	return nil
 }
@@ -67,7 +70,9 @@ func (c *LocalAccContr) Consume(corrId string) (*amqp.AccountRes, error) {
 	delete(c.res, corrId)
 	close(ch)
 	c.mRes.Unlock()
-	loggr.Log.V(4).Info("account result eaten", "id", corrId)
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("account result eaten", "id", corrId)
+	})
 
 	return res, nil
 }
@@ -99,25 +104,34 @@ func (c *LocalAccContr) accountResListener() error {
 
 	go func() {
 		for d := range mgs {
-			loggr.Log.V(4).Info("receive new account result", "id", d.CorrelationId, "body", d.Body)
+			loggr.LogInfo(func(z loggr.LogInf) {
+				z.V(4).Info("receive new account result", "id", d.CorrelationId, "body", d.Body)
+			})
 			c.mRes.Lock()
 			respCh, ok := c.res[d.CorrelationId]
 			c.mRes.Unlock()
 
 			if !ok {
-				loggr.Log.V(4).Info("no waiting receiver for corrId, skipping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(4).Info("no waiting receiver for corrId, skipping", "id", d.CorrelationId)
+				})
 				d.Nack(false, false)
 				continue
 			}
 
 			if d.ContentType != "text/json" {
-				loggr.Log.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
+				})
 				continue
 			}
 
 			var res amqp.AccountRes
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				loggr.Log.V(0).Error(err, "parsing account result failed", "d", d.CorrelationId)
+				loggr.LogError(func(z loggr.LogErr) errro.Error {
+					z.V(0).Error(err, "parsing account result failed", "d", d.CorrelationId)
+					return nil
+				})
 				d.Nack(false, false)
 				continue
 			}
@@ -126,7 +140,9 @@ func (c *LocalAccContr) accountResListener() error {
 			case respCh <- &res:
 				d.Ack(false)
 			default:
-				loggr.Log.V(3).Info("receiver not ready, dropping", "id", d.CorrelationId)
+				loggr.LogInfo(func(z loggr.LogInf) {
+					z.V(3).Info("receiver not ready, dropping", "id", d.CorrelationId)
+				})
 				d.Nack(false, false)
 			}
 		}

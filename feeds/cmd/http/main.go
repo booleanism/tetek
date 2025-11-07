@@ -5,13 +5,19 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
+	"github.com/booleanism/tetek/docs"
+	"github.com/booleanism/tetek/feeds/cmd/http/api"
 	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
+	_ "github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/cmd/http/router"
 	"github.com/booleanism/tetek/feeds/internal/contract"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
+	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
+	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -43,17 +49,40 @@ func main() {
 
 	router := router.NewFeedRouter(rec)
 
+	endp := "/api/v0"
 	app := fiber.New()
-	api := app.Group("/api/v0")
-	{
-		api.Get("/", middleware.OptionalAuth(auth), router.GetFeeds)
-		// TODO: to use Location header fills with created feeds id and return with 201 code
-		api.Post("/", middleware.Auth(auth), router.NewFeed)
-		// TODO: Idempotencies, consistent response if the request is identical
-		api.Delete("/:id<guid>", middleware.Auth(auth), router.DeleteFeed)
-		// TODO: Idempotencies, consistent response if the request is identical
-		api.Put("/hide", middleware.Auth(auth), router.HideFeed)
-	}
+	apiEp := app.Group(endp)
+
+	d, ui := docs.OapiDocs(apiEp, docs.Feeds, endp)
+
+	apiEp.Use(cors.New())
+
+	apiEp.Get("openapi.yaml", func(ctx fiber.Ctx) error {
+		return ctx.SendString(d())
+	})
+
+	apiEp.Get("docs/", func(ctx fiber.Ctx) error {
+		ctx.Set("Content-Type", "text/html")
+
+		ctx.SendString(ui)
+		return nil
+	})
+
+	api.RegisterHandlers(apiEp, router, map[api.OpName][]fiber.Handler{
+		api.OpNameValueGetFeeds: {
+			middleware.OptionalAuth(auth),
+		},
+	}, func(c fiber.Ctx, err error) error {
+		e := errro.FromError(errro.INVALID_REQ, "oapi-codegen middlware error", err)
+		return loggr.LogResWithDepth(3, func(z loggr.LogErr) errro.ResError {
+			z.V(4).Error(err, "oapi-codegen error")
+			res := helper.GenericResponse{
+				Code:    e.Code(),
+				Message: e.Error(),
+			}
+			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		}).SendError(c, fiber.StatusBadRequest)
+	})
 
 	app.Listen(":8083")
 }

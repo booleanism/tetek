@@ -9,7 +9,6 @@ import (
 	"github.com/booleanism/tetek/account/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
@@ -25,9 +24,9 @@ type registRecipes struct {
 
 func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error {
 	if user.Uname == "" || user.Email == "" || user.Passwd == "" {
-		return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EACCOUNT_INVALID_REGIST_PARAM, "uname, email or passwd should not empty")
-			z.Error(e, "missing required user field", "user", user)
+			z.V(3).Error(e, "missing required user field", "user", user)
 			return e
 		})
 	}
@@ -50,9 +49,9 @@ func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error
 
 	passwd, err := bcrypt.GenerateFromPassword([]byte(user.Passwd), bcrypt.DefaultCost)
 	if err != nil {
-		return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EACCOUNT_PASSWD_HASH_FAIL, "failed to hash passwd")
-			z.Error(err, e.Error(), "passwd", user.Passwd)
+			z.V(0).Error(err, e.Error(), "passwd", user.Passwd)
 			return e
 		})
 	}
@@ -68,21 +67,24 @@ func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error
 
 	_, err = r.repo.NewUser(ctx, user)
 	if err != nil {
-		loggr.Log.V(0).Error(err, "cannot creating new user", "user", user)
+		loggr.LogError(func(z loggr.LogErr) errro.Error {
+			z.V(0).Error(err, "cannot creating new user", "user", user)
+			return nil
+		})
 		pgErr := &pgconn.PgError{}
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
-				return loggr.Log.Error(3, func(z logr.LogSink) errro.Error {
+				return loggr.LogError(func(z loggr.LogErr) errro.Error {
 					e := errro.New(errro.EACCOUNT_USER_ALREADY_EXIST, "user already exist")
-					z.Error(pgErr, e.Error(), "user", user)
+					z.V(3).Error(pgErr, e.Error(), "user", user)
 					return e
 				})
 			}
 		}
 
-		return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EACCOUNT_DB_ERR, "error happen with database interaction")
-			z.Error(err, e.Error(), "user", user)
+			z.V(0).Error(err, e.Error(), "user", user)
 			return e
 		})
 	}

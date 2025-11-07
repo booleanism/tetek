@@ -30,7 +30,9 @@ type AccountRes struct {
 }
 
 func AccountSetup(ch *amqp091.Channel) error {
-	loggr.Log.V(4).Info("setup account service exchange and queue")
+	loggr.LogInfo(func(z loggr.LogInf) {
+		z.V(4).Info("setup account service exchange and queue")
+	})
 	err := ch.ExchangeDeclare(ACCOUNT_EXCHANGE, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err

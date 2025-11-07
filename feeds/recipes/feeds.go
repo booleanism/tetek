@@ -12,7 +12,6 @@ import (
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
-	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -55,26 +54,26 @@ func (fr *feedRecipes) Feeds(ctx context.Context, ff repo.FeedsFilter, jwt *mqAu
 	if er != nil {
 		var pgErr *pgconn.PgError
 		if !errors.As(er, &pgErr) {
-			return nil, loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
+			return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
 				e := errro.New(errro.EFEEDS_DB_ERR, "error fetching feeds")
-				z.Error(er, e.Error(), "filter", ff)
+				z.V(2).Error(er, e.Error(), "filter", ff)
 				return e
 			})
 		}
 
 		if pgErr.Code == "23505" {
-			return nil, loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+			return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
 				e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
-				z.Error(pgErr, e.Error(), "filter", ff)
+				z.V(4).Error(pgErr, e.Error(), "filter", ff)
 				return e
 			})
 		}
 	}
 
 	if len(f) == 0 {
-		return nil, loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
-			z.Error(e, e.Error(), "filter", ff)
+			z.V(4).Error(e, e.Error(), "filter", ff)
 			return e
 		})
 	}
@@ -94,9 +93,9 @@ func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.Au
 
 	_, er := fr.repo.NewFeed(ctx, rFeed)
 	if er != nil {
-		return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EFEEDS_DB_ERR, "could not insert new feed")
-			z.Error(er, e.Error(), "feed", rFeed)
+			z.V(0).Error(er, e.Error(), "feed", rFeed)
 			return e
 		})
 	}
@@ -106,9 +105,9 @@ func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.Au
 
 func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
 	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" {
-		return loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
-			z.Error(e, "missing id", "filter", ff)
+			z.V(4).Error(e, "missing id", "filter", ff)
 			return e
 		})
 	}
@@ -130,24 +129,24 @@ func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqA
 	}
 
 	if er == pgx.ErrNoRows {
-		return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EFEEDS_NO_FEEDS, "failed to delete feed: no row")
-			z.Error(er, e.Error(), "feed", f)
+			z.V(4).Error(er, e.Error(), "feed", f)
 			return e
 		})
 	}
 
 	if fDel.Deleted_At == nil {
-		return loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EFEEDS_NO_FEEDS, "failed to delete feed: nil")
-			z.Error(er, e.Error(), "feed", f)
+			z.V(2).Error(er, e.Error(), "feed", f)
 			return e
 		})
 	}
 
-	return loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+	return loggr.LogError(func(z loggr.LogErr) errro.Error {
 		e := errro.New(errro.EFEEDS_DB_ERR, "somthing happen when trying to delete feed")
-		z.Error(er, e.Error(), "feed", f)
+		z.V(0).Error(er, e.Error(), "feed", f)
 		return e
 	})
 }
@@ -171,9 +170,9 @@ func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAut
 
 	_, er := fr.repo.HideFeed(ctx, hf)
 	if er != nil {
-		return loggr.Log.Error(4, func(z logr.LogSink) errro.Error {
+		return loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EFEEDS_DB_ERR, "unable to hide feed")
-			z.Error(er, e.Error())
+			z.V(4).Error(er, e.Error())
 			return e
 		})
 	}
@@ -184,26 +183,26 @@ func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAut
 func (fr *feedRecipes) accAdapter(corrId string, jwt *mqAuth.AuthResult) (*mqAcc.AccountRes, errro.Error) {
 	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
 	if err := fr.accContr.Publish(corrId, t); err != nil {
-		return nil, loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
-			z.Error(err, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
+			z.V(0).Error(err, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
 			return e
 		})
 	}
 
 	res, err := fr.accContr.Consume(corrId)
 	if err != nil {
-		return nil, loggr.Log.Error(0, func(z logr.LogSink) errro.Error {
+		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
-			z.Error(err, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
+			z.V(0).Error(err, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
 			return e
 		})
 	}
 
 	if res.Code != errro.SUCCESS {
-		return nil, loggr.Log.Error(2, func(z logr.LogSink) errro.Error {
+		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
 			e := errro.New(res.Code, "failed to lookup user")
-			z.Error(e, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
+			z.V(2).Error(e, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
 			return e
 		})
 	}
