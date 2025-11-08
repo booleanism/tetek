@@ -15,14 +15,12 @@ import (
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
-	loggr.Register(4)
 	dbStr := os.Getenv("FEEDS_DB_STR")
 	if dbStr == "" {
 		panic("feeds database string empty")
@@ -74,14 +72,11 @@ func main() {
 		},
 	}, func(c fiber.Ctx, err error) error {
 		e := errro.FromError(errro.INVALID_REQ, "oapi-codegen middlware error", err)
-		return loggr.LogResWithDepth(3, func(z loggr.LogErr) errro.ResError {
-			z.V(4).Error(err, "oapi-codegen error")
-			res := helper.GenericResponse{
-				Code:    e.Code(),
-				Message: e.Error(),
-			}
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
-		}).SendError(c, fiber.StatusBadRequest)
+		res := helper.GenericResponse{
+			Code:    e.Code(),
+			Message: e.Error(),
+		}
+		return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(c, fiber.StatusBadRequest)
 	})
 
 	app.Listen(":8083")

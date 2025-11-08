@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type FeedsFilter struct {
@@ -25,16 +25,16 @@ const limit = 30
 type FeedsRepo interface {
 	Feeds(context.Context, FeedsFilter) ([]model.Feed, error)
 	NewFeed(context.Context, model.Feed) (model.Feed, error)
-	DeleteFeed(context.Context, model.Feed) (model.Feed, error)
+	DeleteFeed(context.Context, FeedsFilter) (model.Feed, error)
 	HideFeed(context.Context, HiddenFeeds) (HiddenFeeds, error)
 }
 
 type feedsRepo struct {
-	pool *pgxpool.Pool
+	pool db.Acquireable
 	sq   squirrel.StatementBuilderType
 }
 
-func New(pool *pgxpool.Pool, sq squirrel.StatementBuilderType) *feedsRepo {
+func New(pool db.Acquireable, sq squirrel.StatementBuilderType) *feedsRepo {
 	return &feedsRepo{pool, sq}
 }
 
@@ -121,7 +121,7 @@ func (r *feedsRepo) NewFeed(ctx context.Context, feed model.Feed) (model.Feed, e
 	return f, err
 }
 
-func (r *feedsRepo) DeleteFeed(ctx context.Context, feed model.Feed) (model.Feed, error) {
+func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter) (model.Feed, error) {
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
 		return model.Feed{}, err
@@ -130,9 +130,9 @@ func (r *feedsRepo) DeleteFeed(ctx context.Context, feed model.Feed) (model.Feed
 
 	base := r.sq.Update("feeds").Set("deleted_at", time.Now())
 
-	where := squirrel.Eq{"id": feed.Id}
-	if feed.By != "" {
-		where["by"] = feed.By
+	where := squirrel.Eq{"id": ff.Id}
+	if ff.By != "" {
+		where["by"] = ff.By
 	}
 
 	base = base.Where(where)

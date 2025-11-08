@@ -11,7 +11,6 @@ import (
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -34,10 +33,11 @@ func NewRecipes(repo repo.FeedsRepo, accContr *contract.LocalAccContr) *feedReci
 }
 
 func (fr *feedRecipes) Feeds(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) ([]model.Feed, errro.Error) {
+	traceId := ctx.Value("id").(string)
 	res := &mqAcc.AccountRes{}
 	if jwt != nil {
-		id := uuid.NewString()
-		r, err := fr.accAdapter(id, jwt)
+		t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
+		r, err := fr.accAdapter(traceId, t)
 		if err != nil {
 			return nil, err
 		}
@@ -54,36 +54,29 @@ func (fr *feedRecipes) Feeds(ctx context.Context, ff repo.FeedsFilter, jwt *mqAu
 	if er != nil {
 		var pgErr *pgconn.PgError
 		if !errors.As(er, &pgErr) {
-			return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
-				e := errro.New(errro.EFEEDS_DB_ERR, "error fetching feeds")
-				z.V(2).Error(er, e.Error(), "filter", ff)
-				return e
-			})
+			e := errro.FromError(errro.EFEEDS_DB_ERR, "error fetching feeds", er)
+			return nil, e
 		}
 
 		if pgErr.Code == "23505" {
-			return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
-				e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
-				z.V(4).Error(pgErr, e.Error(), "filter", ff)
-				return e
-			})
+			e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
+			return nil, e
 		}
 	}
 
 	if len(f) == 0 {
-		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
-			z.V(4).Error(e, e.Error(), "filter", ff)
-			return e
-		})
+		e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
+		return nil, e
 	}
 
 	return f, nil
 }
 
 func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.AuthResult) errro.Error {
-	id := uuid.NewString()
-	res, err := fr.accAdapter(id, jwt)
+	traceId := ctx.Value("id").(string)
+
+	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
+	res, err := fr.accAdapter(traceId, t)
 	if err != nil {
 		return err
 	}
@@ -93,32 +86,28 @@ func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.Au
 
 	_, er := fr.repo.NewFeed(ctx, rFeed)
 	if er != nil {
-		return loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EFEEDS_DB_ERR, "could not insert new feed")
-			z.V(0).Error(er, e.Error(), "feed", rFeed)
-			return e
-		})
+		e := errro.FromError(errro.EFEEDS_DB_ERR, "could not insert new feed", er)
+		return e
 	}
 
 	return nil
 }
 
 func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
+	traceId := ctx.Value("id").(string)
+
 	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" {
-		return loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
-			z.V(4).Error(e, "missing id", "filter", ff)
-			return e
-		})
+		e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
+		return e
 	}
 
-	id := uuid.NewString()
-	res, err := fr.accAdapter(id, jwt)
+	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
+	res, err := fr.accAdapter(traceId, t)
 	if err != nil {
 		return err
 	}
 
-	f := model.Feed{
+	f := repo.FeedsFilter{
 		Id: ff.Id,
 		By: res.Detail.Uname,
 	}
@@ -129,35 +118,29 @@ func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqA
 	}
 
 	if er == pgx.ErrNoRows {
-		return loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EFEEDS_NO_FEEDS, "failed to delete feed: no row")
-			z.V(4).Error(er, e.Error(), "feed", f)
-			return e
-		})
+		e := errro.New(errro.EFEEDS_NO_FEEDS, "failed to delete feed: no row")
+		return e
 	}
 
 	if fDel.Deleted_At == nil {
-		return loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EFEEDS_NO_FEEDS, "failed to delete feed: nil")
-			z.V(2).Error(er, e.Error(), "feed", f)
-			return e
-		})
+		e := errro.New(errro.EFEEDS_NO_FEEDS, "no such feed")
+		return e
 	}
 
-	return loggr.LogError(func(z loggr.LogErr) errro.Error {
-		e := errro.New(errro.EFEEDS_DB_ERR, "somthing happen when trying to delete feed")
-		z.V(0).Error(er, e.Error(), "feed", f)
-		return e
-	})
+	e := errro.New(errro.EFEEDS_DB_ERR, "somthing happen when trying to delete feed")
+	return e
 }
 
 func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
+	traceId := ctx.Value("id").(string)
+
 	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" || ff.HiddenTo == "" {
-		return errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "either id or hiddento should not empty")
+		e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
+		return e
 	}
 
-	id := uuid.NewString()
-	res, err := fr.accAdapter(id, jwt)
+	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
+	res, err := fr.accAdapter(traceId, t)
 	if err != nil {
 		return err
 	}
@@ -170,41 +153,28 @@ func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAut
 
 	_, er := fr.repo.HideFeed(ctx, hf)
 	if er != nil {
-		return loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EFEEDS_DB_ERR, "unable to hide feed")
-			z.V(4).Error(er, e.Error())
-			return e
-		})
+		e := errro.FromError(errro.EFEEDS_DB_ERR, "unable to hide feed", er)
+		return e
 	}
 
 	return nil
 }
 
-func (fr *feedRecipes) accAdapter(corrId string, jwt *mqAuth.AuthResult) (*mqAcc.AccountRes, errro.Error) {
-	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
+func (fr *feedRecipes) accAdapter(corrId string, t mqAcc.AccountTask) (*mqAcc.AccountRes, errro.Error) {
 	if err := fr.accContr.Publish(corrId, t); err != nil {
-		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
-			z.V(0).Error(err, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
-			return e
-		})
+		e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
+		return nil, e
 	}
 
 	res, err := fr.accContr.Consume(corrId)
 	if err != nil {
-		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
-			z.V(0).Error(err, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
-			return e
-		})
+		e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
+		return nil, e
 	}
 
 	if res.Code != errro.SUCCESS {
-		return nil, loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(res.Code, "failed to lookup user")
-			z.V(2).Error(e, e.Error(), "id", corrId, "user", jwt.Claims.Uname)
-			return e
-		})
+		e := errro.New(res.Code, "failed to lookup user")
+		return nil, e
 	}
 
 	return res, nil

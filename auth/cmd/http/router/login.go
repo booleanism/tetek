@@ -8,7 +8,6 @@ import (
 	"github.com/booleanism/tetek/auth/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -39,15 +38,9 @@ func (req loginRequest) toUser() amqp.User {
 
 func Login(logRec recipes.LoginRecipe) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		loggr.LogInfo(func(z loggr.LogInf) {
-			z.V(4).Info("new incoming login request")
-		})
 		req := loginRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
-				z.V(3).Error(err, "failed to bind request", "body", ctx.Body())
-				return err
-			}).SendError(ctx, fiber.StatusBadRequest)
+			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		jwt, err := logRec.Login(req.toUser())
@@ -60,9 +53,6 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 					Email: req.Email,
 				},
 			}
-			loggr.LogInfo(func(z loggr.LogInf) {
-				z.V(4).Info(res.Message)
-			})
 			ctx.Set("Authorization", fmt.Sprintf("Bearer %s", jwt))
 			return ctx.Status(fiber.StatusOK).JSONP(res)
 		}

@@ -7,7 +7,6 @@ import (
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -29,15 +28,9 @@ func (r registResponse) Json() []byte {
 
 func Regist(rec recipes.RegistRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		loggr.LogInfo(func(z loggr.LogInf) {
-			z.V(4).Info("new incoming regist request")
-		})
 		req := registRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
-			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
-				z.V(3).Error(err, "failed to bind request", "body", ctx.Body())
-				return err
-			}).SendError(ctx, fiber.StatusBadRequest)
+			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		err := rec.Regist(ctx, model.User{
@@ -51,9 +44,6 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				Code:    errro.SUCCESS,
 				Message: "register success",
 			}
-			loggr.LogInfo(func(z loggr.LogInf) {
-				z.V(4).Info("success registering user", "response", res)
-			})
 			return ctx.Status(fiber.StatusOK).JSON(&res)
 		}
 
@@ -65,10 +55,8 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				},
 				Detail: req,
 			}
-			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
-				z.V(4).Error(err, "user already exist")
-				return err.WithDetail(res.Json(), errro.TDETAIL_JSON)
-			}).SendError(ctx, fiber.StatusConflict)
+
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusConflict)
 		}
 
 		if err.Code() == errro.EACCOUNT_INVALID_REGIST_PARAM {
@@ -79,10 +67,8 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				},
 				Detail: req,
 			}
-			return loggr.LogRes(func(z loggr.LogErr) errro.ResError {
-				z.V(4).Error(err, "registration form is not fullfiled")
-				return err.WithDetail(res.Json(), errro.TDETAIL_JSON)
-			}).SendError(ctx, fiber.StatusBadRequest)
+
+			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		res := registResponse{

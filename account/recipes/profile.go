@@ -6,7 +6,6 @@ import (
 	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -22,17 +21,12 @@ func (r *profileRecipe) Profile(ctx context.Context, user model.User) (model.Use
 	u, err := r.repo.GetUser(ctx, user)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			return model.User{}, loggr.LogError(func(z loggr.LogErr) errro.Error {
-				e := errro.New(errro.EACCOUNT_NO_USER, "couldn't find user")
-				z.V(3).Error(err, e.Error(), "user", user)
-				return e
-			})
+			e := errro.New(errro.EACCOUNT_NO_USER, "couldn't find user")
+			return model.User{}, e
 		}
-		return model.User{}, loggr.LogError(func(z loggr.LogErr) errro.Error {
-			e := errro.New(errro.EACCOUNT_DB_ERR, "something happen with database interaction")
-			z.V(0).Error(err, e.Error(), "user", user)
-			return e
-		})
+
+		e := errro.New(errro.EACCOUNT_DB_ERR, "something happen with database interaction")
+		return model.User{}, e
 	}
 
 	return model.User{

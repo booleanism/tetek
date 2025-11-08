@@ -9,13 +9,11 @@ import (
 	"github.com/booleanism/tetek/account/internal/repo"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/db"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
-	loggr.Register(4)
 	dbStr := os.Getenv("ACCOUNT_DB_STR")
 	if dbStr == "" {
 		panic("database connection string empty")

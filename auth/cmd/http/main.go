@@ -7,13 +7,11 @@ import (
 	"github.com/booleanism/tetek/auth/internal/contract"
 	"github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/auth/recipes"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
 )
 
 func main() {
-	loggr.Register(4)
 	mqStr := os.Getenv("BROKER_STR")
 	if mqStr == "" {
 		panic("amqp connection string empty")

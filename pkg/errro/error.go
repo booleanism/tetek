@@ -35,6 +35,8 @@ const (
 
 const SUCCESS = 0
 const INVALID_REQ = EACCOUNT_PARSE_FAIL
+const YOUR_BAD = 16
+const MY_BAD = 17
 
 const (
 	EAUTH_JWT_GENERATAION_FAIL     = -7
@@ -86,14 +88,14 @@ func (e *err) Code() int {
 	return e.c
 }
 
-type resErr struct {
-	*err
-}
-
 func (e *err) WithDetail(detail []byte, detailType int) *resErr {
 	e.detail = detail
 	e.t = detailType
 	return &resErr{e}
+}
+
+type resErr struct {
+	*err
 }
 
 func (e *resErr) Error() string {

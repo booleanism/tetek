@@ -2,7 +2,6 @@ package amqp
 
 import (
 	"github.com/booleanism/tetek/auth/internal/jwt"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -27,9 +26,6 @@ type AuthResult struct {
 }
 
 func AuthSetup(ch *amqp091.Channel) error {
-	loggr.LogInfo(func(z loggr.LogInf) {
-		z.V(4).Info("setup auth service exchange and queue")
-	})
 	err := ch.ExchangeDeclare(AUTH_EXCHANGE, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err

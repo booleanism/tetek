@@ -2,7 +2,6 @@ package amqp
 
 import (
 	"github.com/booleanism/tetek/account/internal/model"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -30,9 +29,6 @@ type AccountRes struct {
 }
 
 func AccountSetup(ch *amqp091.Channel) error {
-	loggr.LogInfo(func(z loggr.LogInf) {
-		z.V(4).Info("setup account service exchange and queue")
-	})
 	err := ch.ExchangeDeclare(ACCOUNT_EXCHANGE, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err

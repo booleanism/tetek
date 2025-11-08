@@ -6,7 +6,6 @@ import (
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -37,23 +36,13 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 
 	go func() {
 		for d := range mgs {
-			loggr.LogInfo(func(z loggr.LogInf) {
-				z.V(4).Info("receive new auth task", "id", d.CorrelationId, "body", d.Body)
-			})
 			if d.ContentType != "text/json" {
-				loggr.LogInfo(func(z loggr.LogInf) {
-					z.V(4).Info("content type missmatch, skipping", "id", d.CorrelationId)
-				})
 				continue
 			}
 
 			task := amqp.AuthTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				loggr.LogError(func(z loggr.LogErr) errro.Error {
-					z.V(0).Error(err, "auth task parsing failed", "id", d.CorrelationId)
-					return nil
-				})
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_PARSE_FAIL})
 				ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
@@ -66,10 +55,6 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 
 			claim, err := c.jwt.Verify(task.Jwt)
 			if err != nil {
-				loggr.LogError(func(z loggr.LogErr) errro.Error {
-					z.V(2).Error(err, "jwt verification failed", "id", d.CorrelationId, "jwt", task.Jwt)
-					return nil
-				})
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_JWT_VERIFY_FAIL, AuthTask: task})
 				ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
@@ -81,9 +66,6 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 			}
 
 			res, _ := json.Marshal(amqp.AuthResult{Code: errro.SUCCESS, AuthTask: task, Claims: *claim})
-			loggr.LogInfo(func(z loggr.LogInf) {
-				z.V(4).Info("authorization success", "id", d.CorrelationId, "result", res)
-			})
 			ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 				CorrelationId: d.CorrelationId,
 				Body:          res,
