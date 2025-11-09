@@ -45,6 +45,9 @@ func main() {
 	auth := contract.NewAuth(mqCon)
 	rec := recipes.NewRecipes(repo, acc)
 
+	feedsContr := contract.NewFeeds(mqCon, repo)
+	feedsContr.WorkerFeedsListener()
+
 	router := router.NewFeedRouter(rec)
 
 	endp := "/api/v0"
