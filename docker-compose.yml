@@ -2,6 +2,8 @@ services:
   feeds-db:
     image: postgres:18-alpine
     restart: always
+    networks:
+      - feedsnet
     environment:
       POSTGRES_PASSWORD: ${FEEDS_DB_PASSWD}
       POSTGRES_USER: ${FEEDS_DB_USER}
@@ -14,6 +16,8 @@ services:
   account-db:
     image: postgres:18-alpine
     restart: always
+    networks:
+      - accountnet
     environment:
       POSTGRES_PASSWORD: ${ACCOUNT_DB_PASSWD}
       POSTGRES_USER: ${ACCOUNT_DB_USER}
@@ -22,10 +26,26 @@ services:
       - account-db-vol:/var/lib/postgresql/data 
     ports:
       - 5432:5432
+
+  comments-db:
+    image: postgres:18-alpine
+    restart: always
+    networks:
+      - commentsnet
+    environment:
+      POSTGRES_PASSWORD: ${COMMS_DB_PASSWD}
+      POSTGRES_USER: ${COMMS_DB_USER}
+      POSTGRES_DB: ${COMMS_DB_NAME}
+    volumes:
+      - comms-db-vol:/var/lib/postgresql/data 
+    ports:
+      - 5434:5432
  
   broker:
     image: rabbitmq:4.1-management-alpine
     restart: always
+    networks:
+      - brokernet
     ports:
       - 5672:5672
       - 15672:15672
@@ -35,4 +55,12 @@ services:
 volumes:
   feeds-db-vol:
   account-db-vol:
+  comms-db-vol:
   broker-vol:
+
+networks:
+  brokernet:
+  accountnet:
+  feedsnet:
+  authnet:
+  commentsnet:

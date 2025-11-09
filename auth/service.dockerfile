@@ -1,0 +1,15 @@
+FROM golang:alpine3.22 AS builder
+
+WORKDIR /app
+COPY --from=deps /go/pkg/mod /go/pkg/mod
+
+COPY . .
+RUN go build -ldflags="-s -w" auth/cmd/http/main.go
+
+FROM scratch
+
+COPY --from=builder /app/main /auth.bin
+
+CMD [ "./auth.bin" ]
+
+EXPOSE 8081
