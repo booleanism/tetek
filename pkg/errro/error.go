@@ -38,6 +38,7 @@ const INVALID_REQ = EACCOUNT_PARSE_FAIL
 const YOUR_BAD = 16
 const MY_BAD = 17
 const LOGGING_ERROR = -9
+const TIMEOUT = -13
 
 const (
 	EAUTH_JWT_GENERATAION_FAIL     = -7
@@ -50,6 +51,7 @@ const (
 	EAUTH_INVALID_CREDS            = 9
 	EAUTH_MISSING_HEADER           = 10
 	EAUTH_INVALID_AUTH_RESULT_TYPE = 12
+	EAUTH_JWT_MALFORMAT            = 19
 )
 
 const (
@@ -66,7 +68,7 @@ const (
 	ECOMM_FAIL_BUILD_TREE = -10
 	ECOMM_PUB_FAIL        = -11
 	ECOMM_CONSUME_FAIL    = -12
-	ECOMM_NO_COMM         = 16
+	ECOMM_NO_COMM         = 18
 )
 
 type err struct {
@@ -109,7 +111,11 @@ type resErr struct {
 }
 
 func (e *resErr) Error() string {
-	return fmt.Sprintf("%s: %s", e.m, e.e.Error())
+	if e.m != e.e.Error() {
+		return fmt.Sprintf("%s: %s", e.m, e.e.Error())
+	}
+
+	return e.m
 }
 
 func (e *resErr) SendError(ctx fiber.Ctx, status int) error {

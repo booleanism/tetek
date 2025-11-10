@@ -11,7 +11,6 @@ import (
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
-	"github.com/oapi-codegen/runtime/types"
 )
 
 type deleteRequest struct {
@@ -23,7 +22,7 @@ type deleteResponse struct {
 	Detail deleteRequest `json:"detail"`
 }
 
-func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx, id types.UUID) error {
+func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 	req := deleteRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
 		return err.SendError(ctx, fiber.StatusBadRequest)

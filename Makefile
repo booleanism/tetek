@@ -8,7 +8,6 @@ VERSION:=v0.0.1
 
 setup: .deps
 	go install -tags 'pgx5' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
-	go install github.com/booleanism/oapi-codegen/v2/cmd/oapi-codegen@v2.5.1-p5
 	go mod tidy
 
 .deps:
@@ -55,14 +54,6 @@ run-auth-worker: build-auth-worker
 
 run-feeds-worker: build-feeds-worker
 	docker run --env-file .env --network=tetek6_feedsnet --network=tetek6_brokernet --name feeds-worker -it --rm -p 8083:8083 feeds-worker:${VERSION} 
-
-gen: docs-feeds docs-comments
-
-gen-feeds:
-	oapi-codegen -config feeds/cmd/http/api/config.yaml docs/api/v0/feeds.yaml
-
-gen-comments:
-	oapi-codegen -config comments/cmd/http/api/config.yaml docs/api/v0/comments.yaml
 
 migrate: migrate-account migrate-feeds migrate-comments
 

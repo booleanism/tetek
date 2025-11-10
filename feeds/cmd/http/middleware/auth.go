@@ -3,15 +3,21 @@ package middleware
 import (
 	"context"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
-	"github.com/booleanism/tetek/comments/cmd/http/api"
 	"github.com/booleanism/tetek/feeds/internal/contract"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/gofiber/fiber/v3"
 )
+
+type AuthValueKey struct{}
+
+type authRequest struct {
+	Authorization string `header:"Authorization"`
+}
 
 func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
@@ -30,7 +36,7 @@ func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 				ctx, helper.RequestIdKey{},
 				id,
 			),
-			5*time.Second,
+			1*time.Second,
 		)
 		defer cancel()
 
@@ -43,17 +49,31 @@ func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 			ctx.Next()
 		}
 
-		ctx.Locals("jwt", authRes)
+		ctx.Locals(AuthValueKey{}, authRes)
 		return ctx.Next()
 	}
 }
 
 func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
-	jwt, ok := ctx.Locals(api.BearerAuthScopes).(string)
-	if !ok {
+	req := authRequest{}
+	if err := helper.BindRequest(ctx, &req); err != nil {
+		return "", errro.New(errro.INVALID_REQ, err.Error())
+	}
+
+	if req.Authorization == "" {
 		res := helper.GenericResponse{
 			Code:    errro.EAUTH_MISSING_HEADER,
 			Message: "missing authorization header",
+		}
+		e := errro.New(res.Code, res.Message)
+		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+	}
+
+	jwt, ok := strings.CutPrefix(req.Authorization, "Bearer ")
+	if !ok {
+		res := helper.GenericResponse{
+			Code:    errro.EAUTH_MISSMATCH_AUTH_MECHANISM,
+			Message: "mismatch authorization mechanism",
 		}
 		e := errro.New(res.Code, res.Message)
 		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
@@ -63,7 +83,7 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 	if !r.Match([]byte(jwt)) {
 		res := helper.GenericResponse{
 			Code:    errro.EAUTH_JWT_MALFORMAT,
-			Message: "malformat jwt",
+			Message: "jwt malformat",
 		}
 		e := errro.New(res.Code, res.Message)
 		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
@@ -111,7 +131,7 @@ func Auth(auth *contract.LocalAuthContr) fiber.Handler {
 			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
-		ctx.Locals("jwt", authRes)
+		ctx.Locals(AuthValueKey{}, authRes)
 
 		return ctx.Next()
 	}
@@ -139,7 +159,7 @@ func actualAuth(ctx context.Context, auth *contract.LocalAuthContr, jwt string, 
 	}
 
 	if authr.Code == errro.SUCCESS {
-		authRes = &authr
+		(*authRes) = authr
 		return nil
 	}
 

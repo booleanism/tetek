@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
-	"github.com/booleanism/tetek/feeds/cmd/http/api"
+	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
@@ -42,7 +42,7 @@ func NewFeedRouter(rec recipes.FeedRecipes) FeedsRouter {
 	return FeedsRouter{rec}
 }
 
-func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx, param api.GetFeedsParams) error {
+func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 	if ctx.IsMiddleware() {
 		return ctx.Next()
 	}
@@ -52,7 +52,7 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx, param api.GetFeedsParams) error {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	jwt, _ := ctx.Locals("jwt").(*amqp.AuthResult)
+	jwt, _ := ctx.Locals(middleware.AuthValueKey{}).(*amqp.AuthResult)
 	filter := repo.FeedsFilter{
 		Offset: uint64(req.Offset),
 		Type:   req.Type,
@@ -84,7 +84,7 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx, param api.GetFeedsParams) error {
 			Code:    err.Code(),
 			Message: err.Error(),
 		}
-		return ctx.Status(fiber.StatusNotFound).JSON(res)
+		return ctx.Status(fiber.StatusNotFound).JSON(&res)
 	}
 
 	res := helper.GenericResponse{

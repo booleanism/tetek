@@ -6,14 +6,12 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/docs"
-	"github.com/booleanism/tetek/feeds/cmd/http/api"
 	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	_ "github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/cmd/http/router"
 	"github.com/booleanism/tetek/feeds/internal/contract"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
-	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -57,6 +55,7 @@ func main() {
 	d, ui := docs.OapiDocs(apiEp, docs.Feeds, endp)
 
 	apiEp.Use(cors.New())
+	apiEp.Use(helper.GenerateRequestId)
 
 	apiEp.Get("openapi.yaml", func(ctx fiber.Ctx) error {
 		return ctx.SendString(d())
@@ -65,23 +64,13 @@ func main() {
 	apiEp.Get("docs/", func(ctx fiber.Ctx) error {
 		ctx.Set("Content-Type", "text/html")
 
-		ctx.SendString(ui)
-		return nil
+		return ctx.SendString(ui)
 	})
 
-	api.RegisterHandlers(apiEp, router, map[api.OpName][]fiber.Handler{
-		api.OpNameValueGetFeeds: {
-			middleware.OptionalAuth(auth),
-			helper.GenerateRequestId,
-		},
-	}, func(c fiber.Ctx, err error) error {
-		e := errro.FromError(errro.INVALID_REQ, "oapi-codegen middlware error", err)
-		res := helper.GenericResponse{
-			Code:    e.Code(),
-			Message: e.Error(),
-		}
-		return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(c, fiber.StatusBadRequest)
-	})
+	apiEp.Get("/", middleware.OptionalAuth(auth), router.GetFeeds)
+	apiEp.Post("/", middleware.Auth(auth), router.NewFeed)
+	apiEp.Delete("/:id", middleware.Auth(auth), router.DeleteFeed)
+	apiEp.Patch("/hide", middleware.Auth(auth), router.HideFeed)
 
 	app.Listen(":8083")
 }
