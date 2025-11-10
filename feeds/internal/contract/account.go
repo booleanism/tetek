@@ -1,11 +1,13 @@
 package contract
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"sync"
 
 	"github.com/booleanism/tetek/account/amqp"
+	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -51,7 +53,8 @@ func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
 	return nil
 }
 
-func (c *LocalAccContr) Consume(corrId string) (*amqp.AccountRes, error) {
+func (c *LocalAccContr) Consume(ctx context.Context) (*amqp.AccountRes, error) {
+	corrId := ctx.Value(helper.RequestIdKey{}).(string)
 	c.mRes.Lock()
 	ch, ok := c.res[corrId]
 	c.mRes.Unlock()
@@ -59,14 +62,17 @@ func (c *LocalAccContr) Consume(corrId string) (*amqp.AccountRes, error) {
 		return nil, errors.New("no result with given correlation id")
 	}
 
-	res := <-ch
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("failed to consume account task")
+	case res := <-ch:
+		c.mRes.Lock()
+		delete(c.res, corrId)
+		close(ch)
+		c.mRes.Unlock()
 
-	c.mRes.Lock()
-	delete(c.res, corrId)
-	close(ch)
-	c.mRes.Unlock()
-
-	return res, nil
+		return res, nil
+	}
 }
 
 func (c *LocalAccContr) accountResListener() error {

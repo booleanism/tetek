@@ -1,11 +1,13 @@
 package contract
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"sync"
 
 	"github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -24,7 +26,8 @@ func NewAuth(con *amqp091.Connection) *LocalAuthContr {
 	return self
 }
 
-func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
+func (c *LocalAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error {
+	corrId := ctx.Value(helper.RequestIdKey{}).(string)
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -51,7 +54,8 @@ func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
 	return nil
 }
 
-func (c *LocalAuthContr) Consume(corrId string) (*amqp.AuthResult, error) {
+func (c *LocalAuthContr) Consume(ctx context.Context) (*amqp.AuthResult, error) {
+	corrId := ctx.Value(helper.RequestIdKey{}).(string)
 	c.mRes.Lock()
 	ch, ok := c.res[corrId]
 	c.mRes.Unlock()
@@ -59,14 +63,17 @@ func (c *LocalAuthContr) Consume(corrId string) (*amqp.AuthResult, error) {
 		return nil, errors.New("no result with given correlation id")
 	}
 
-	res := <-ch
+	select {
+	case <-ctx.Done():
+		return nil, errors.New("failed to consume auth task")
+	case res := <-ch:
+		c.mRes.Lock()
+		delete(c.res, corrId)
+		close(ch)
+		c.mRes.Unlock()
 
-	c.mRes.Lock()
-	delete(c.res, corrId)
-	close(ch)
-	c.mRes.Unlock()
-
-	return res, nil
+		return res, nil
+	}
 }
 
 func (c *LocalAuthContr) authResListener() error {

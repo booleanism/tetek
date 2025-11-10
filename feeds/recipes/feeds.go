@@ -34,11 +34,10 @@ func NewRecipes(repo repo.FeedsRepo, accContr *contract.LocalAccContr) *feedReci
 }
 
 func (fr *feedRecipes) Feeds(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) ([]model.Feed, errro.Error) {
-	traceId := ctx.Value(helper.RequestIdKey{}).(string)
 	res := &mqAcc.AccountRes{}
 	if jwt != nil {
 		t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-		r, err := fr.accAdapter(traceId, t)
+		r, err := fr.accAdapter(ctx, t)
 		if err != nil {
 			return nil, err
 		}
@@ -74,9 +73,8 @@ func (fr *feedRecipes) Feeds(ctx context.Context, ff repo.FeedsFilter, jwt *mqAu
 }
 
 func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.AuthResult) errro.Error {
-	traceId := ctx.Value(helper.RequestIdKey{}).(string)
 	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-	res, err := fr.accAdapter(traceId, t)
+	res, err := fr.accAdapter(ctx, t)
 	if err != nil {
 		return err
 	}
@@ -94,14 +92,14 @@ func (fr *feedRecipes) New(ctx context.Context, rFeed model.Feed, jwt *mqAuth.Au
 }
 
 func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
-	traceId := ctx.Value(helper.RequestIdKey{}).(string)
+	// traceId := ctx.Value(helper.RequestIdKey{}).(string)
 	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" {
 		e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
 		return e
 	}
 
 	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-	res, err := fr.accAdapter(traceId, t)
+	res, err := fr.accAdapter(ctx, t)
 	if err != nil {
 		return err
 	}
@@ -131,14 +129,14 @@ func (fr *feedRecipes) Delete(ctx context.Context, ff repo.FeedsFilter, jwt *mqA
 }
 
 func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAuth.AuthResult) errro.Error {
-	traceId := ctx.Value(helper.RequestIdKey{}).(string)
+	// traceId := ctx.Value(helper.RequestIdKey{}).(string)
 	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" || ff.HiddenTo == "" {
 		e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
 		return e
 	}
 
 	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-	res, err := fr.accAdapter(traceId, t)
+	res, err := fr.accAdapter(ctx, t)
 	if err != nil {
 		return err
 	}
@@ -158,13 +156,14 @@ func (fr *feedRecipes) Hide(ctx context.Context, ff repo.FeedsFilter, jwt *mqAut
 	return nil
 }
 
-func (fr *feedRecipes) accAdapter(corrId string, t mqAcc.AccountTask) (*mqAcc.AccountRes, errro.Error) {
+func (fr *feedRecipes) accAdapter(ctx context.Context, t mqAcc.AccountTask) (*mqAcc.AccountRes, errro.Error) {
+	corrId := ctx.Value(helper.RequestIdKey{}).(string)
 	if err := fr.accContr.Publish(corrId, t); err != nil {
 		e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
 		return nil, e
 	}
 
-	res, err := fr.accContr.Consume(corrId)
+	res, err := fr.accContr.Consume(ctx)
 	if err != nil {
 		e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
 		return nil, e
