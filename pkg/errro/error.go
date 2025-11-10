@@ -37,6 +37,7 @@ const SUCCESS = 0
 const INVALID_REQ = EACCOUNT_PARSE_FAIL
 const YOUR_BAD = 16
 const MY_BAD = 17
+const LOGGING_ERROR = -9
 
 const (
 	EAUTH_JWT_GENERATAION_FAIL     = -7
@@ -55,8 +56,17 @@ const (
 	EFEEDS_MISSING_REQUIRED_FIELD = 11
 	EFEEDS_DB_ERR                 = EACCOUNT_DB_ERR
 	EFEEDS_NEW_FAIL               = 13
-	EFEEDS_NO_FEEDS               = 14
+	EFEEDS_NO_FEEDS               = EACCOUNT_NO_USER
 	EFEEDS_DELETE_FAIL            = 15
+	EFEEDS_PARSE_FAIL             = EACCOUNT_PARSE_FAIL
+)
+
+const (
+	ECOMM_DB_ERR          = EFEEDS_DB_ERR
+	ECOMM_FAIL_BUILD_TREE = -10
+	ECOMM_PUB_FAIL        = -11
+	ECOMM_CONSUME_FAIL    = -12
+	ECOMM_NO_COMM         = 16
 )
 
 type err struct {

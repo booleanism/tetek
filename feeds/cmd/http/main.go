@@ -72,6 +72,7 @@ func main() {
 	api.RegisterHandlers(apiEp, router, map[api.OpName][]fiber.Handler{
 		api.OpNameValueGetFeeds: {
 			middleware.OptionalAuth(auth),
+			helper.GenerateRequestId,
 		},
 	}, func(c fiber.Ctx, err error) error {
 		e := errro.FromError(errro.INVALID_REQ, "oapi-codegen middlware error", err)

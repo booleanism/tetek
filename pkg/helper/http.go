@@ -5,6 +5,7 @@ import (
 
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/gofiber/fiber/v3"
+	"github.com/google/uuid"
 )
 
 type GenericResponse struct {
@@ -27,4 +28,11 @@ func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
 		return errro.New(errro.INVALID_REQ, "malformat request, failed to bind the request").WithDetail(r.Json(), errro.TDETAIL_JSON)
 	}
 	return nil
+}
+
+type RequestIdKey struct{}
+
+func GenerateRequestId(ctx fiber.Ctx) error {
+	ctx.Locals(RequestIdKey{}, uuid.NewString())
+	return ctx.Next()
 }
