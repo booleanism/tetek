@@ -31,4 +31,5 @@ func main() {
 		panic(err)
 	}
 	defer ch.Close()
+	select {}
 }

@@ -30,5 +30,11 @@ func main() {
 
 	rep := repo.NewUserRepo(dbPool)
 	acc := contract.NewAccount(mqCon, rep)
-	acc.WorkerAccountListener()
+	ch, err := acc.WorkerAccountListener()
+	if err != nil {
+		panic(err.Error())
+	}
+	defer ch.Close()
+
+	select {}
 }

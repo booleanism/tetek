@@ -1,4 +1,4 @@
-package worker
+package main
 
 import (
 	"os"
@@ -32,5 +32,11 @@ func main() {
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 	rep := repo.New(dbPool, sq)
 	acc := contract.NewFeeds(mqCon, rep)
-	acc.WorkerFeedsListener()
+	ch, err := acc.WorkerFeedsListener()
+	if err != nil {
+	}
+	defer ch.Close()
+
+	select {}
+
 }
