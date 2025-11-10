@@ -21,7 +21,8 @@ func (r *feedsRepo) HideFeed(ctx context.Context, hf HiddenFeeds) (HiddenFeeds, 
 
 	f := HiddenFeeds{}
 	err = q.QueryRow(
-		ctx, "INSERT INTO hiddenfeeds (id, to_uname, feed) VALUES ($1, $2, $3) RETURNING id, to_uname, feed",
+		ctx,
+		"INSERT INTO hiddenfeeds (id, to_uname, feed) VALUES ($1, $2, $3) ON CONFLICT (to_uname, feed) DO UPDATE SET feed = EXCLUDED.feed RETURNING id, to_uname, feed",
 		hf.Id, hf.To, hf.FeedId,
 	).Scan(&f.Id, &f.To, &f.FeedId)
 
