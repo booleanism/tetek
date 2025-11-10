@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
@@ -28,7 +29,7 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	j := ctx.Locals("jwt")
+	j := ctx.Locals(middleware.AuthValueKey{})
 	jwt, ok := j.(*amqp.AuthResult)
 	if !ok {
 		res := helper.GenericResponse{
@@ -71,7 +72,7 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 	if err.Code() == errro.EFEEDS_NO_FEEDS && ff.By != "" {
 		res := helper.GenericResponse{
 			Code:    errro.EFEEDS_DELETE_FAIL,
-			Message: "unauthorized user to performe this actio",
+			Message: "unauthorized user to performe this action",
 		}
 		return ctx.Status(fiber.StatusUnauthorized).JSON(&res)
 	}

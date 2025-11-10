@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
@@ -27,7 +28,7 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	jwt, ok := ctx.Locals("jwt").(*amqp.AuthResult)
+	jwt, ok := ctx.Locals(middleware.AuthValueKey{}).(*amqp.AuthResult)
 	if !ok {
 		res := helper.GenericResponse{
 			Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
