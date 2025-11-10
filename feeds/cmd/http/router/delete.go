@@ -1,7 +1,9 @@
 package router
 
 import (
+	"context"
 	"strings"
+	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/internal/repo"
@@ -47,7 +49,15 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx, id types.UUID) error {
 		ff.By = jwt.Claims.Uname
 	}
 
-	err := fr.rec.Delete(ctx, ff, jwt)
+	cto, cancel := context.WithTimeout(
+		context.WithValue(
+			context.Background(),
+			helper.RequestIdKey{},
+			ctx.Locals(helper.RequestIdKey{})),
+		TIMEOUT*time.Second)
+	defer cancel()
+
+	err := fr.rec.Delete(cto, ff, jwt)
 	if err == nil {
 		res := deleteResponse{
 			GenericResponse: helper.GenericResponse{

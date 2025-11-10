@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -59,8 +60,16 @@ func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
 		return e.SendError(ctx, fiber.StatusUnauthorized)
 	}
 
+	cto, cancel := context.WithTimeout(
+		context.WithValue(
+			context.Background(),
+			helper.RequestIdKey{},
+			ctx.Locals(helper.RequestIdKey{})),
+		TIMEOUT*time.Second)
+	defer cancel()
+
 	f := req.ToFeed()
-	err := fr.rec.New(ctx, f, jwt)
+	err := fr.rec.New(cto, f, jwt)
 	if err == nil {
 		res := newFeedResponse{
 			GenericResponse: helper.GenericResponse{

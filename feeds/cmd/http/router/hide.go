@@ -1,6 +1,9 @@
 package router
 
 import (
+	"context"
+	"time"
+
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -39,7 +42,15 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 		HiddenTo: jwt.Claims.Uname,
 	}
 
-	err := fr.rec.Hide(ctx, ff, jwt)
+	cto, cancel := context.WithTimeout(
+		context.WithValue(
+			context.Background(),
+			helper.RequestIdKey{},
+			ctx.Locals(helper.RequestIdKey{})),
+		TIMEOUT*time.Second)
+	defer cancel()
+
+	err := fr.rec.Hide(cto, ff, jwt)
 	if err != nil {
 		res := helper.GenericResponse{
 			Code:    err.Code(),

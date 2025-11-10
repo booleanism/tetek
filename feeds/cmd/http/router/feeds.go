@@ -1,7 +1,9 @@
 package router
 
 import (
+	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/cmd/http/api"
@@ -13,6 +15,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
+
+const TIMEOUT = 10
 
 type getFeedsRequest struct {
 	Id     uuid.UUID `query:"id"`
@@ -55,7 +59,15 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx, param api.GetFeedsParams) error {
 		Id:     req.Id,
 	}
 
-	f, err := fr.rec.Feeds(ctx, filter, jwt)
+	cto, cancel := context.WithTimeout(
+		context.WithValue(
+			context.Background(),
+			helper.RequestIdKey{},
+			ctx.Locals(helper.RequestIdKey{})),
+		TIMEOUT*time.Second)
+	defer cancel()
+
+	f, err := fr.rec.Feeds(cto, filter, jwt)
 	if err == nil {
 		res := getFeedsResponse{
 			GenericResponse: helper.GenericResponse{
