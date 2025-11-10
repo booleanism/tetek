@@ -4,7 +4,7 @@ WORKDIR /app
 COPY --from=deps /go/pkg/mod /go/pkg/mod
 
 COPY . .
-RUN go build -ldflags="-s -w" feeds/cmd/worker/main.go
+RUN --mount=type=cache,target=/root/.cache/go-build go build -ldflags="-s -w" feeds/cmd/worker/main.go
 
 FROM scratch
 
