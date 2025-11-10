@@ -35,6 +35,9 @@ build-auth-worker: .deps
 build-feeds: .deps
 	docker build -t feeds:${VERSION} -f feeds/service.dockerfile .
 
+build-feeds-worker: .deps
+	docker build -t feeds-worker:${VERSION} -f feeds/worker.dockerfile .
+
 run-account: build-account
 	docker run --env-file .env --network=tetek6_accountnet --network=tetek6_brokernet --name account-service -it --rm -p 8082:8082 account:${VERSION} 
 
@@ -44,12 +47,21 @@ run-auth: build-auth
 run-feeds: build-feeds
 	docker run --env-file .env --network=tetek6_feedsnet --network=tetek6_brokernet --name feeds-service -it --rm -p 8083:8083 feeds:${VERSION} 
 
-docs: docs-feeds docs-comments
+run-account-worker: build-account-worker
+	docker run --env-file .env --network=tetek6_accountnet --network=tetek6_brokernet --name account-worker -it --rm -p 8082:8082 account-worker:${VERSION} 
 
-docs-feeds:
+run-auth-worker: build-auth-worker
+	docker run --env-file .env --network=tetek6_brokernet --name auth-worker -it --rm -p 8081:8081 auth-worker:${VERSION} 
+
+run-feeds-worker: build-feeds-worker
+	docker run --env-file .env --network=tetek6_feedsnet --network=tetek6_brokernet --name feeds-worker -it --rm -p 8083:8083 feeds-worker:${VERSION} 
+
+gen: docs-feeds docs-comments
+
+gen-feeds:
 	oapi-codegen -config feeds/cmd/http/api/config.yaml docs/api/v0/feeds.yaml
 
-docs-comments:
+gen-comments:
 	oapi-codegen -config comments/cmd/http/api/config.yaml docs/api/v0/comments.yaml
 
 migrate: migrate-account migrate-feeds migrate-comments
