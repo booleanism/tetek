@@ -1,9 +1,11 @@
 package helper
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/gofiber/fiber/v3"
 	"github.com/google/uuid"
 )
@@ -30,9 +32,7 @@ func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
 	return nil
 }
 
-type RequestIdKey struct{}
-
 func GenerateRequestId(ctx fiber.Ctx) error {
-	ctx.Locals(RequestIdKey{}, uuid.NewString())
+	ctx.SetContext(context.WithValue(ctx.Context(), keystore.RequestId{}, uuid.NewString()))
 	return ctx.Next()
 }

@@ -1,33 +1,39 @@
-package contract
+package contracts
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/booleanism/tetek/auth/amqp"
-	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type LocalAuthContr struct {
+type AuthSubscribe interface {
+	Publish(context.Context, amqp.AuthTask) error
+	Consume(context.Context, **amqp.AuthResult) error
+}
+
+type localAuthContr struct {
 	con  *amqp091.Connection
 	res  map[string]chan *amqp.AuthResult
 	mRes sync.Mutex
 }
 
-func NewAuth(con *amqp091.Connection) *LocalAuthContr {
-	self := &LocalAuthContr{con: con, res: make(map[string]chan *amqp.AuthResult)}
-	if err := self.authResListener(); err != nil {
+func SubsribeAuth(con *amqp091.Connection, subcriberName string) *localAuthContr {
+	self := &localAuthContr{con: con, res: make(map[string]chan *amqp.AuthResult)}
+	if err := self.authResListener(subcriberName); err != nil {
 		panic(err)
 	}
 
 	return self
 }
 
-func (c *LocalAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error {
-	corrId := ctx.Value(helper.RequestIdKey{}).(string)
+func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error {
+	corrId := ctx.Value(keystore.RequestId{}).(string)
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -54,29 +60,29 @@ func (c *LocalAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error 
 	return nil
 }
 
-func (c *LocalAuthContr) Consume(ctx context.Context) (*amqp.AuthResult, error) {
-	corrId := ctx.Value(helper.RequestIdKey{}).(string)
+func (c *localAuthContr) Consume(ctx context.Context, res **amqp.AuthResult) error {
+	corrId := ctx.Value(keystore.RequestId{}).(string)
 	c.mRes.Lock()
 	ch, ok := c.res[corrId]
 	c.mRes.Unlock()
 	if !ok {
-		return nil, errors.New("no result with given correlation id")
+		return errors.New("no result with given correlation id")
 	}
 
 	select {
 	case <-ctx.Done():
-		return nil, errors.New("failed to consume auth task")
-	case res := <-ch:
+		return errors.New("failed to consume auth task")
+	case *res = <-ch:
 		c.mRes.Lock()
 		delete(c.res, corrId)
 		close(ch)
 		c.mRes.Unlock()
 
-		return res, nil
+		return nil
 	}
 }
 
-func (c *LocalAuthContr) authResListener() error {
+func (c *localAuthContr) authResListener(name string) error {
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -86,7 +92,7 @@ func (c *LocalAuthContr) authResListener() error {
 		return err
 	}
 
-	q, err := ch.QueueDeclare("auth_res_feeds", true, false, false, false, nil)
+	q, err := ch.QueueDeclare(fmt.Sprintf("auth_res_%s", name), true, false, false, false, nil)
 	if err != nil {
 		return err
 	}

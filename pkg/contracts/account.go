@@ -1,32 +1,43 @@
-package contract
+package contracts
 
 import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"sync"
 
 	"github.com/booleanism/tetek/account/amqp"
-	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type LocalAccContr struct {
+type AccountSubscribe interface {
+	Publish(context.Context, amqp.AccountTask) error
+	Consume(context.Context, **amqp.AccountRes) error
+}
+
+type localAccContr struct {
 	con  *amqp091.Connection
 	res  map[string]chan *amqp.AccountRes
 	mRes sync.Mutex
 }
 
-func NewAccount(con *amqp091.Connection) *LocalAccContr {
-	self := &LocalAccContr{con: con, res: make(map[string]chan *amqp.AccountRes)}
-	if err := self.accountResListener(); err != nil {
+func SubscribeAccount(con *amqp091.Connection, subcriberName string) *localAccContr {
+	self := &localAccContr{con: con, res: make(map[string]chan *amqp.AccountRes)}
+	if err := self.accountResListener(subcriberName); err != nil {
 		panic(err)
 	}
 
 	return self
 }
 
-func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
+func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) error {
+	corrId, ok := ctx.Value(keystore.RequestId{}).(string)
+	if !ok {
+		return errors.New("no requestId")
+	}
+
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -53,29 +64,29 @@ func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
 	return nil
 }
 
-func (c *LocalAccContr) Consume(ctx context.Context) (*amqp.AccountRes, error) {
-	corrId := ctx.Value(helper.RequestIdKey{}).(string)
+func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountRes) error {
+	corrId := ctx.Value(keystore.RequestId{}).(string)
 	c.mRes.Lock()
 	ch, ok := c.res[corrId]
 	c.mRes.Unlock()
 	if !ok {
-		return nil, errors.New("no result with given correlation id")
+		return errors.New("no result with given correlation id")
 	}
 
 	select {
 	case <-ctx.Done():
-		return nil, errors.New("failed to consume account task")
-	case res := <-ch:
+		return errors.New("failed to consume account task")
+	case *res = <-ch:
 		c.mRes.Lock()
 		delete(c.res, corrId)
 		close(ch)
 		c.mRes.Unlock()
 
-		return res, nil
+		return nil
 	}
 }
 
-func (c *LocalAccContr) accountResListener() error {
+func (c *localAccContr) accountResListener(name string) error {
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -85,7 +96,7 @@ func (c *LocalAccContr) accountResListener() error {
 		return err
 	}
 
-	q, err := ch.QueueDeclare("account_res_feeds", true, false, false, false, nil)
+	q, err := ch.QueueDeclare(fmt.Sprintf("account_res_%s", name), true, false, false, false, nil)
 	if err != nil {
 		return err
 	}

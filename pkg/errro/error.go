@@ -46,6 +46,7 @@ const (
 	EAUTH_SERVICE_UNAVAILABLE      = -3
 	EAUTH_PARSE_FAIL               = EACCOUNT_PARSE_FAIL
 	EAUTH_JWT_VERIFY_FAIL          = 4
+	EAUTH_EMPTY_JWT                = 19
 	EAUTH_MISSMATCH_AUTH_MECHANISM = 5
 	EAUTH_INVALID_LOGIN_PARAM      = 6
 	EAUTH_INVALID_CREDS            = 9
@@ -85,7 +86,7 @@ const (
 )
 
 func New(code int, msg string) *err {
-	return &err{code, msg, errors.New(msg), nil, 0}
+	return &err{code, "", errors.New(msg), nil, 0}
 }
 
 func FromError(code int, msg string, e error) *err {

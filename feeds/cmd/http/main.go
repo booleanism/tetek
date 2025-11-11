@@ -6,13 +6,13 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/docs"
-	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
-	_ "github.com/booleanism/tetek/feeds/cmd/http/middleware"
 	"github.com/booleanism/tetek/feeds/cmd/http/router"
 	"github.com/booleanism/tetek/feeds/internal/contract"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
+	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/rabbitmq/amqp091-go"
@@ -39,8 +39,8 @@ func main() {
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 	repo := repo.New(dbPool, sq)
-	acc := contract.NewAccount(mqCon)
-	auth := contract.NewAuth(mqCon)
+	acc := contracts.SubscribeAccount(mqCon, "feeds")
+	auth := contracts.SubsribeAuth(mqCon, "feeds")
 	rec := recipes.NewRecipes(repo, acc)
 
 	feedsContr := contract.NewFeeds(mqCon, repo)
@@ -67,10 +67,10 @@ func main() {
 		return ctx.SendString(ui)
 	})
 
-	apiEp.Get("/", middleware.OptionalAuth(auth), router.GetFeeds)
-	apiEp.Post("/", middleware.Auth(auth), router.NewFeed)
-	apiEp.Delete("/:id", middleware.Auth(auth), router.DeleteFeed)
-	apiEp.Patch("/hide", middleware.Auth(auth), router.HideFeed)
+	apiEp.Get("/", middlewares.Auth(auth), router.GetFeeds)
+	apiEp.Post("/", middlewares.Auth(auth), router.NewFeed)
+	apiEp.Delete("/:id", middlewares.Auth(auth), router.DeleteFeed)
+	apiEp.Patch("/hide", middlewares.Auth(auth), router.HideFeed)
 
 	app.Listen(":8083")
 }

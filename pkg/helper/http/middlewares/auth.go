@@ -1,4 +1,4 @@
-package middleware
+package middlewares
 
 import (
 	"context"
@@ -7,19 +7,18 @@ import (
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
-	"github.com/booleanism/tetek/feeds/internal/contract"
+	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/gofiber/fiber/v3"
 )
-
-type AuthValueKey struct{}
 
 type authRequest struct {
 	Authorization string `header:"Authorization"`
 }
 
-func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
+func OptionalAuth(auth contracts.AuthSubscribe) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		jwt, er := checkJwt(ctx)
 		if er != nil {
@@ -30,18 +29,16 @@ func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 		// system assumes it's valid jwt format if user passes Authorization header.
 		// And if auth worker dead, then it will wait for 5 second to make sure.
 		// Keep calm, it's affected only and only if auth worker is dead.
-		id := ctx.Locals(helper.RequestIdKey{}).(string)
+		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
 		cto, cancel := context.WithTimeout(
-			context.WithValue(
-				ctx, helper.RequestIdKey{},
-				id,
-			),
+			c,
 			1*time.Second,
 		)
 		defer cancel()
 
 		var authRes *amqp.AuthResult
-		if err := actualAuth(cto, auth, jwt, &authRes); err != nil {
+		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))
+		if err := actualAuth(cto, auth, &authRes); err != nil {
 			return ctx.Next()
 		}
 
@@ -49,7 +46,6 @@ func OptionalAuth(auth *contract.LocalAuthContr) fiber.Handler {
 			ctx.Next()
 		}
 
-		ctx.Locals(AuthValueKey{}, authRes)
 		return ctx.Next()
 	}
 }
@@ -60,31 +56,26 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 		return "", errro.New(errro.INVALID_REQ, err.Error())
 	}
 
+	res := helper.GenericResponse{}
 	if req.Authorization == "" {
-		res := helper.GenericResponse{
-			Code:    errro.EAUTH_MISSING_HEADER,
-			Message: "missing authorization header",
-		}
+		res.Code = errro.EAUTH_MISSING_HEADER
+		res.Message = "missing authorization header"
 		e := errro.New(res.Code, res.Message)
 		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
 
 	jwt, ok := strings.CutPrefix(req.Authorization, "Bearer ")
 	if !ok {
-		res := helper.GenericResponse{
-			Code:    errro.EAUTH_MISSMATCH_AUTH_MECHANISM,
-			Message: "mismatch authorization mechanism",
-		}
+		res.Code = errro.EAUTH_MISSMATCH_AUTH_MECHANISM
+		res.Message = "mismatch authorization mechanism"
 		e := errro.New(res.Code, res.Message)
 		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
 
 	r := regexp.MustCompile(`^(?:[\w-]*\.){2}[\w-]*$`)
 	if !r.Match([]byte(jwt)) {
-		res := helper.GenericResponse{
-			Code:    errro.EAUTH_JWT_MALFORMAT,
-			Message: "jwt malformat",
-		}
+		res.Code = errro.EAUTH_JWT_MALFORMAT
+		res.Message = "jwt malformat"
 		e := errro.New(res.Code, res.Message)
 		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
@@ -92,82 +83,74 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 	return jwt, nil
 }
 
-func Auth(auth *contract.LocalAuthContr) fiber.Handler {
+func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		jwt, er := checkJwt(ctx)
+		res := helper.GenericResponse{}
 		if er != nil {
-			res := helper.GenericResponse{
-				Code:    er.Code(),
-				Message: er.Error(),
-			}
+			res.Code = er.Code()
+			res.Message = er.Error()
 			return er.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
-		id := ctx.Locals(helper.RequestIdKey{}).(string)
+		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
 		cto, cancel := context.WithTimeout(
-			context.WithValue(
-				ctx, helper.RequestIdKey{},
-				id,
-			),
-			10*time.Second,
+			c,
+			5*time.Second,
 		)
 		defer cancel()
 
 		var authRes *amqp.AuthResult
-		if err := actualAuth(cto, auth, jwt, &authRes); err != nil {
+		if err := actualAuth(cto, auth, &authRes); err != nil {
 			if err.Code() == errro.EAUTH_SERVICE_UNAVAILABLE {
 				return err.SendError(ctx, fiber.StatusRequestTimeout)
 			}
-
 			return err.SendError(ctx, fiber.StatusUnauthorized)
 		}
-		if authRes == nil {
-			res := helper.GenericResponse{
-				Code:    errro.EAUTH_JWT_VERIFY_FAIL,
-				Message: "authorization failed",
-			}
 
+		if authRes == nil {
+			res.Code = errro.EAUTH_JWT_VERIFY_FAIL
+			res.Message = "authorization failed"
 			e := errro.New(res.Code, res.Message)
 			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
-		ctx.Locals(AuthValueKey{}, authRes)
-
+		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))
 		return ctx.Next()
 	}
 }
 
-func actualAuth(ctx context.Context, auth *contract.LocalAuthContr, jwt string, authRes **amqp.AuthResult) errro.ResError {
-	task := amqp.AuthTask{Jwt: jwt}
-	if err := auth.Publish(ctx, task); err != nil {
-		res := helper.GenericResponse{
-			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
-			Message: "auth service unavailable: publishing auth task",
-		}
+func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amqp.AuthResult) errro.ResError {
+	authTask, ok := ctx.Value(keystore.AuthTask{}).(*amqp.AuthTask)
+	res := helper.GenericResponse{}
+	if !ok {
+		res.Code = errro.EAUTH_EMPTY_JWT
+		res.Message = "did not receive jwt"
 		e := errro.New(res.Code, res.Message)
 		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
 
-	authr, err := auth.Consume(ctx)
+	if err := auth.Publish(ctx, *authTask); err != nil {
+		res.Code = errro.EAUTH_SERVICE_UNAVAILABLE
+		res.Message = "auth service unavailable: publishing auth task"
+		e := errro.New(res.Code, res.Message)
+		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+	}
+
+	err := auth.Consume(ctx, authRes)
 	if err != nil {
-		res := helper.GenericResponse{
-			Code:    errro.EAUTH_SERVICE_UNAVAILABLE,
-			Message: "auth service unavailable: consuming auth result",
-		}
+		res.Code = errro.EAUTH_SERVICE_UNAVAILABLE
+		res.Message = "auth service unavailable: consuming auth result"
 		e := errro.New(res.Code, res.Message)
 		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
 
-	if authr.Code == errro.SUCCESS {
-		(*authRes) = authr
+	if (*authRes).Code == errro.SUCCESS {
 		return nil
 	}
 
-	res := helper.GenericResponse{
-		Code:    errro.EAUTH_JWT_VERIFY_FAIL,
-		Message: "authorization failed",
-	}
-
+	res.Code = errro.EAUTH_JWT_VERIFY_FAIL
+	res.Message = "authorization failed"
 	e := errro.New(res.Code, res.Message)
 	return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 }

@@ -5,67 +5,42 @@ import (
 	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
-	"github.com/booleanism/tetek/feeds/cmd/http/middleware"
-	"github.com/booleanism/tetek/feeds/internal/repo"
+	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
-type hideRequest struct {
-	Id uuid.UUID `json:"id"`
-}
-
-type hideResponse struct {
-	helper.GenericResponse
-	Detail hideRequest `json:"detail"`
-}
-
 func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
-	req := hideRequest{}
+	req := recipes.HideRequest{}
+	gRes := helper.GenericResponse{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	jwt, ok := ctx.Locals(middleware.AuthValueKey{}).(*amqp.AuthResult)
+	_, ok := ctx.Context().Value(keystore.AuthRes{}).(*amqp.AuthResult)
 	if !ok {
-		res := helper.GenericResponse{
-			Code:    errro.EAUTH_INVALID_AUTH_RESULT_TYPE,
-			Message: "does not represent jwt type",
-		}
-		e := errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON)
+		gRes.Code = errro.EAUTH_INVALID_AUTH_RESULT_TYPE
+		gRes.Message = "does not represent jwt type"
+		e := errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDETAIL_JSON)
 		return e.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	ff := repo.FeedsFilter{
-		Id:       req.Id,
-		HiddenTo: jwt.Claims.Uname,
-	}
-
 	cto, cancel := context.WithTimeout(
-		context.WithValue(
-			context.Background(),
-			helper.RequestIdKey{},
-			ctx.Locals(helper.RequestIdKey{})),
+		ctx.Context(),
 		TIMEOUT*time.Second)
 	defer cancel()
 
-	err := fr.rec.Hide(cto, ff, jwt)
+	err := fr.rec.Hide(cto, req)
 	if err != nil {
-		res := helper.GenericResponse{
-			Code:    err.Code(),
-			Message: err.Error(),
-		}
-		return errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+		gRes.Code = err.Code()
+		gRes.Message = err.Error()
+		return errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 
-	res := hideResponse{
-		GenericResponse: helper.GenericResponse{
-			Code:    errro.SUCCESS,
-			Message: "feed hidden",
-		},
-		Detail: req,
-	}
+	gRes.Code = errro.SUCCESS
+	gRes.Message = "feed hidden"
+	res := recipes.HideResponse{GenericResponse: gRes, Detail: req}
 	return ctx.Status(fiber.StatusOK).JSON(&res)
 }
