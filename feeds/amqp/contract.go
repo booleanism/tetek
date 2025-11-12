@@ -22,7 +22,7 @@ type FeedsTask struct {
 	Feeds
 }
 
-type FeedsRes struct {
+type FeedsResult struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Detail  Feeds  `json:"feeds"`

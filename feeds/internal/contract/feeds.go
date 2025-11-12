@@ -46,7 +46,7 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 			task := amqp.FeedsTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				res, _ := json.Marshal(&amqp.FeedsRes{Code: errro.EFEEDS_PARSE_FAIL, Message: "error parsing feeds task"})
+				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.EFEEDS_PARSE_FAIL, Message: "error parsing feeds task"})
 				ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
@@ -60,7 +60,7 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 				ff := repo.FeedsFilter{Id: task.Id}
 				u, err := c.repo.Feeds(context.Background(), ff)
 				if err == nil {
-					res, _ := json.Marshal(&amqp.FeedsRes{Code: errro.SUCCESS, Message: "user found", Detail: u[len(u)-1]})
+					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.SUCCESS, Message: "user found", Detail: u[len(u)-1]})
 					ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
@@ -71,7 +71,7 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 				}
 
 				if err == pgx.ErrNoRows {
-					res, _ := json.Marshal(&amqp.FeedsRes{Code: errro.EFEEDS_NO_FEEDS, Message: "user not found", Detail: model.Feed{Id: ff.Id}})
+					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.EFEEDS_NO_FEEDS, Message: "user not found", Detail: model.Feed{Id: ff.Id}})
 					ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
@@ -81,7 +81,7 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 					continue
 				}
 
-				res, _ := json.Marshal(&amqp.FeedsRes{Code: errro.EFEEDS_DB_ERR, Message: "something happen in our end", Detail: model.Feed{Id: ff.Id}})
+				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.EFEEDS_DB_ERR, Message: "something happen in our end", Detail: model.Feed{Id: ff.Id}})
 				ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,

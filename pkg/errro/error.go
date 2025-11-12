@@ -1,7 +1,6 @@
 package errro
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/gofiber/fiber/v3"
@@ -66,6 +65,8 @@ const (
 
 const (
 	ECOMM_DB_ERR          = EFEEDS_DB_ERR
+	ECOMM_QUERY_ERR       = -14
+	ECOMM_SCAN_ERR        = -15
 	ECOMM_FAIL_BUILD_TREE = -10
 	ECOMM_PUB_FAIL        = -11
 	ECOMM_CONSUME_FAIL    = -12
@@ -86,7 +87,7 @@ const (
 )
 
 func New(code int, msg string) *err {
-	return &err{code, "", errors.New(msg), nil, 0}
+	return &err{code, msg, nil, nil, 0}
 }
 
 func FromError(code int, msg string, e error) *err {
@@ -94,7 +95,11 @@ func FromError(code int, msg string, e error) *err {
 }
 
 func (e *err) Error() string {
-	return fmt.Sprintf("%s: %s", e.m, e.e.Error())
+	if e.e != nil && e.m != e.e.Error() {
+		return fmt.Sprintf("%s: %s", e.m, e.e.Error())
+	}
+
+	return e.m
 }
 
 func (e *err) Code() int {
@@ -107,12 +112,22 @@ func (e *err) WithDetail(detail []byte, detailType int) *resErr {
 	return &resErr{e}
 }
 
+type Jsonable interface {
+	Json() []byte
+}
+
+func (e *err) WithJson(res Jsonable) *resErr {
+	e.detail = res.Json()
+	e.t = TDETAIL_JSON
+	return &resErr{e}
+}
+
 type resErr struct {
 	*err
 }
 
 func (e *resErr) Error() string {
-	if e.m != e.e.Error() {
+	if e.e != nil && e.m != e.e.Error() {
 		return fmt.Sprintf("%s: %s", e.m, e.e.Error())
 	}
 

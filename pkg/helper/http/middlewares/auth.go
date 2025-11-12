@@ -130,17 +130,9 @@ func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amq
 		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
 
-	if err := auth.Publish(ctx, *authTask); err != nil {
+	if err := authAdapter(ctx, auth, *authTask, authRes); err != nil {
 		res.Code = errro.EAUTH_SERVICE_UNAVAILABLE
 		res.Message = "auth service unavailable: publishing auth task"
-		e := errro.New(res.Code, res.Message)
-		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
-	}
-
-	err := auth.Consume(ctx, authRes)
-	if err != nil {
-		res.Code = errro.EAUTH_SERVICE_UNAVAILABLE
-		res.Message = "auth service unavailable: consuming auth result"
 		e := errro.New(res.Code, res.Message)
 		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
 	}
@@ -153,4 +145,18 @@ func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amq
 	res.Message = "authorization failed"
 	e := errro.New(res.Code, res.Message)
 	return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+}
+
+func authAdapter(ctx context.Context, auth contracts.AuthSubscribe, t amqp.AuthTask, res **amqp.AuthResult) errro.Error {
+	if err := auth.Publish(ctx, t); err != nil {
+		e := errro.FromError(errro.ECOMM_PUB_FAIL, "failed to publish auth task", err)
+		return e
+	}
+
+	err := auth.Consume(ctx, res)
+	if err != nil {
+		e := errro.FromError(errro.ECOMM_CONSUME_FAIL, "failed to consume auth result", err)
+		return e
+	}
+	return nil
 }
