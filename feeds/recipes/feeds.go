@@ -5,8 +5,6 @@ import (
 	"errors"
 	"strings"
 
-	"github.com/booleanism/tetek/account/amqp"
-	mqAcc "github.com/booleanism/tetek/account/amqp"
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/repo"
@@ -41,23 +39,15 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest) ([]model.
 		Id:     req.Id,
 	}
 
-	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
-	var res *mqAcc.AccountRes
-	if jwt != nil {
-		t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-		err := fr.accAdapter(ctx, t, &res)
-		if err != nil {
-			return nil, err
-		}
+	jwt, ok := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
+	if ok {
+		ff.HiddenTo = jwt.Claims.Uname
 	}
 
 	if ff.Type == "" {
 		ff.Type = "M"
 	}
 	ff.Type = strings.ToUpper(ff.Type)
-	if res != nil {
-		ff.HiddenTo = res.Detail.Uname
-	}
 
 	f, er := fr.repo.Feeds(ctx, ff)
 	if er != nil {
@@ -84,14 +74,8 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest) ([]model.
 func (fr *feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error {
 	rFeed := req.ToFeed()
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
-	var res *amqp.AccountRes
-	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-	err := fr.accAdapter(ctx, t, &res)
-	if err != nil {
-		return err
-	}
 
-	rFeed.By = res.Detail.Uname
+	rFeed.By = jwt.Claims.Uname
 	rFeed.Type = strings.ToUpper(rFeed.Type)
 
 	_, er := fr.repo.NewFeed(ctx, rFeed)
@@ -114,15 +98,8 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 	}
 
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
-	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-	var res *amqp.AccountRes
-	err := fr.accAdapter(ctx, t, &res)
-	if err != nil {
-		return err
-	}
-
 	// only moderator freely to delete feed
-	if strings.ToLower(res.Detail.Uname) != "m" {
+	if strings.ToLower(jwt.Claims.Role) != "m" {
 		ff.By = jwt.Claims.Uname
 	}
 
@@ -149,42 +126,15 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 // Validate feed by req.Id
 func (fr *feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
-	t := mqAcc.AccountTask{Cmd: 0, User: mqAcc.User{Uname: jwt.Claims.Uname}}
-	var res *mqAcc.AccountRes
-	err := fr.accAdapter(ctx, t, &res)
-	if err != nil {
-		return err
-	}
-
 	hf := repo.HiddenFeeds{
 		Id:     uuid.NewString(),
-		To:     res.Detail.Uname,
+		To:     jwt.Claims.Uname,
 		FeedId: req.Id,
 	}
 
 	_, er := fr.repo.HideFeed(ctx, hf)
 	if er != nil {
 		e := errro.FromError(errro.EFEEDS_DB_ERR, "unable to hide feed", er)
-		return e
-	}
-
-	return nil
-}
-
-func (fr *feedRecipes) accAdapter(ctx context.Context, t mqAcc.AccountTask, res **mqAcc.AccountRes) errro.Error {
-	if err := fr.accContr.Publish(ctx, t); err != nil {
-		e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
-		return e
-	}
-
-	err := fr.accContr.Consume(ctx, res)
-	if err != nil {
-		e := errro.New(errro.EACCOUNT_SERVICE_UNAVAILABLE, "failed to communicate with account service")
-		return e
-	}
-
-	if (*res).Code != errro.SUCCESS {
-		e := errro.New((*res).Code, "failed to lookup user")
 		return e
 	}
 
