@@ -37,7 +37,6 @@ func OptionalAuth(auth contracts.AuthSubscribe) fiber.Handler {
 		defer cancel()
 
 		var authRes *amqp.AuthResult
-		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))
 		if err := actualAuth(cto, auth, &authRes); err != nil {
 			return ctx.Next()
 		}
@@ -46,6 +45,7 @@ func OptionalAuth(auth contracts.AuthSubscribe) fiber.Handler {
 			ctx.Next()
 		}
 
+		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))
 		return ctx.Next()
 	}
 }

@@ -71,7 +71,7 @@ func (c *localAuthContr) Consume(ctx context.Context, res **amqp.AuthResult) err
 
 	select {
 	case <-ctx.Done():
-		return errors.New("failed to consume auth task")
+		return errors.New("failed to consume auth result")
 	case *res = <-ch:
 		c.mRes.Lock()
 		delete(c.res, corrId)

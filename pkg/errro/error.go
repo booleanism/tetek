@@ -70,7 +70,7 @@ const (
 	ECOMM_FAIL_BUILD_TREE = -10
 	ECOMM_PUB_FAIL        = -11
 	ECOMM_CONSUME_FAIL    = -12
-	ECOMM_NO_COMM         = 18
+	ECOMM_NO_COMM         = EACCOUNT_NO_USER
 )
 
 type err struct {
