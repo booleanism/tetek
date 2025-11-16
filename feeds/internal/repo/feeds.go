@@ -95,12 +95,18 @@ func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter) ([]model.Feed, er
 
 func scanRows(rws pgx.Rows) ([]model.Feed, error) {
 	feeds := []model.Feed{}
+	n := 0
 	for rws.Next() {
 		f := model.Feed{}
 		if err := rws.Scan(&f.Id, &f.Title, &f.Url, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.Created_At); err != nil {
 			return nil, err
 		}
 		feeds = append(feeds, f)
+		n++
+	}
+
+	if n == 0 {
+		return nil, pgx.ErrNoRows
 	}
 
 	return feeds, nil
