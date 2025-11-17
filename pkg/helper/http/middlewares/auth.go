@@ -42,7 +42,7 @@ func OptionalAuth(auth contracts.AuthSubscribe) fiber.Handler {
 		}
 
 		if authRes == nil {
-			ctx.Next()
+			return ctx.Next()
 		}
 
 		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))

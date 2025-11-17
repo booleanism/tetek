@@ -24,15 +24,19 @@ func NewAccount(con *amqp091.Connection) *LocalAccContr {
 	return self
 }
 
-func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
+func (c *LocalAccContr) Publish(corrID string, task amqp.AccountTask) error {
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	c.mRes.Lock()
-	c.res[corrId] = make(chan *amqp.AccountRes)
+	c.res[corrID] = make(chan *amqp.AccountRes)
 	c.mRes.Unlock()
 
 	t, err := json.Marshal(&task)
@@ -41,7 +45,7 @@ func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
 	}
 
 	if err = ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_TASK_RK, false, false, amqp091.Publishing{
-		CorrelationId: corrId,
+		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
 	}); err != nil {
@@ -51,9 +55,9 @@ func (c *LocalAccContr) Publish(corrId string, task amqp.AccountTask) error {
 	return nil
 }
 
-func (c *LocalAccContr) Consume(corrId string) (*amqp.AccountRes, error) {
+func (c *LocalAccContr) Consume(corrID string) (*amqp.AccountRes, error) {
 	c.mRes.Lock()
-	ch, ok := c.res[corrId]
+	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
 		return nil, errors.New("no result with given correlation id")
@@ -62,7 +66,7 @@ func (c *LocalAccContr) Consume(corrId string) (*amqp.AccountRes, error) {
 	res := <-ch
 
 	c.mRes.Lock()
-	delete(c.res, corrId)
+	delete(c.res, corrID)
 	close(ch)
 	c.mRes.Unlock()
 
@@ -101,7 +105,9 @@ func (c *LocalAccContr) accountResListener() error {
 			c.mRes.Unlock()
 
 			if !ok {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
@@ -111,15 +117,21 @@ func (c *LocalAccContr) accountResListener() error {
 
 			var res amqp.AccountRes
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			select {
 			case respCh <- &res:
-				d.Ack(false)
+				if err := d.Ack(false); err != nil {
+					continue
+				}
 			default:
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 			}
 		}
 	}()

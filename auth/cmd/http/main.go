@@ -21,7 +21,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer mqCon.Close()
+	defer func() {
+		if err := mqCon.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	jwtSecret := os.Getenv("AUTH_JWT_SECRET")
 	if jwtSecret == "" {
@@ -34,7 +38,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	accContr := contract.NewAccount(mqCon)
 	logRec := recipes.NewLogin(accContr, jwt)

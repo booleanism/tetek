@@ -33,12 +33,16 @@ func SubsribeAuth(con *amqp091.Connection, subcriberName string) *localAuthContr
 }
 
 func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error {
-	corrId := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestId{}).(string)
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	t, err := json.Marshal(&task)
 	if err != nil {
@@ -46,11 +50,11 @@ func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error 
 	}
 
 	c.mRes.Lock()
-	c.res[corrId] = make(chan *amqp.AuthResult, 1)
+	c.res[corrID] = make(chan *amqp.AuthResult, 1)
 	c.mRes.Unlock()
 
 	if err = ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_TASK_RK, false, false, amqp091.Publishing{
-		CorrelationId: corrId,
+		CorrelationId: corrID,
 		Body:          t,
 		ContentType:   "text/json",
 	}); err != nil {
@@ -61,9 +65,9 @@ func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error 
 }
 
 func (c *localAuthContr) Consume(ctx context.Context, res **amqp.AuthResult) error {
-	corrId := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestId{}).(string)
 	c.mRes.Lock()
-	ch, ok := c.res[corrId]
+	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
 		return errors.New("no result with given correlation id")
@@ -74,7 +78,7 @@ func (c *localAuthContr) Consume(ctx context.Context, res **amqp.AuthResult) err
 		return errors.New("failed to consume auth result")
 	case *res = <-ch:
 		c.mRes.Lock()
-		delete(c.res, corrId)
+		delete(c.res, corrID)
 		close(ch)
 		c.mRes.Unlock()
 
@@ -114,7 +118,9 @@ func (c *localAuthContr) authResListener(name string) error {
 			c.mRes.Unlock()
 
 			if !ok {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
@@ -122,17 +128,23 @@ func (c *localAuthContr) authResListener(name string) error {
 				continue
 			}
 
-			var res = amqp.AuthResult{}
+			res := amqp.AuthResult{}
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			select {
 			case respCh <- &res:
-				d.Ack(false)
+				if err := d.Ack(false); err != nil {
+					continue
+				}
 			default:
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 			}
 		}
 	}()

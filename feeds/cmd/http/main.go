@@ -44,7 +44,9 @@ func main() {
 	rec := recipes.NewRecipes(repo, acc)
 
 	feedsContr := contract.NewFeeds(mqCon, repo)
-	feedsContr.WorkerFeedsListener()
+	if _, err := feedsContr.WorkerFeedsListener(); err != nil {
+		panic(err)
+	}
 
 	router := router.NewFeedRouter(rec)
 
@@ -72,5 +74,7 @@ func main() {
 	apiEp.Delete("/:id", middlewares.Auth(auth), router.DeleteFeed)
 	apiEp.Patch("/hide", middlewares.Auth(auth), router.HideFeed)
 
-	app.Listen(":8083")
+	if err := app.Listen(":8083"); err != nil {
+		panic(err)
+	}
 }

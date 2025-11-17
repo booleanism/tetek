@@ -33,7 +33,7 @@ func SubscribeAccount(con *amqp091.Connection, subcriberName string) *localAccCo
 }
 
 func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) error {
-	corrId, ok := ctx.Value(keystore.RequestId{}).(string)
+	corrID, ok := ctx.Value(keystore.RequestId{}).(string)
 	if !ok {
 		return errors.New("no requestId")
 	}
@@ -42,10 +42,14 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	c.mRes.Lock()
-	c.res[corrId] = make(chan *amqp.AccountRes)
+	c.res[corrID] = make(chan *amqp.AccountRes)
 	c.mRes.Unlock()
 
 	t, err := json.Marshal(&task)
@@ -54,7 +58,7 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 	}
 
 	if err = ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_TASK_RK, false, false, amqp091.Publishing{
-		CorrelationId: corrId,
+		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
 	}); err != nil {
@@ -65,9 +69,9 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 }
 
 func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountRes) error {
-	corrId := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestId{}).(string)
 	c.mRes.Lock()
-	ch, ok := c.res[corrId]
+	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
 		return errors.New("no result with given correlation id")
@@ -78,7 +82,7 @@ func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountRes) erro
 		return errors.New("failed to consume account task")
 	case *res = <-ch:
 		c.mRes.Lock()
-		delete(c.res, corrId)
+		delete(c.res, corrID)
 		close(ch)
 		c.mRes.Unlock()
 
@@ -118,7 +122,9 @@ func (c *localAccContr) accountResListener(name string) error {
 			c.mRes.Unlock()
 
 			if !ok {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
@@ -128,15 +134,21 @@ func (c *localAccContr) accountResListener(name string) error {
 
 			var res amqp.AccountRes
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			select {
 			case respCh <- &res:
-				d.Ack(false)
+				if err := d.Ack(false); err != nil {
+					continue
+				}
 			default:
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 			}
 		}
 	}()

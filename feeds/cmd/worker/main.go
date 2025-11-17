@@ -34,9 +34,13 @@ func main() {
 	acc := contract.NewFeeds(mqCon, rep)
 	ch, err := acc.WorkerFeedsListener()
 	if err != nil {
+		panic(err)
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	select {}
-
 }

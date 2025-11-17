@@ -44,34 +44,47 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_PARSE_FAIL})
-				ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
+				if err := ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
-				})
-				d.Nack(false, false)
+				}); err != nil {
+					continue
+				}
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			claim, err := c.jwt.Verify(task.Jwt)
 			if err != nil {
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_JWT_VERIFY_FAIL, AuthTask: task})
-				ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
+				if err := ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
-				})
-				d.Nack(false, false)
+				}); err != nil {
+					continue
+				}
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			res, _ := json.Marshal(amqp.AuthResult{Code: errro.SUCCESS, AuthTask: task, Claims: *claim})
-			ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
+			if err := ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
 				CorrelationId: d.CorrelationId,
 				Body:          res,
 				ContentType:   "text/json",
-			})
-			d.Ack(false)
+			}); err != nil {
+				continue
+			}
+			if err := d.Ack(false); err != nil {
+				continue
+			}
+			continue
 		}
 	}()
 

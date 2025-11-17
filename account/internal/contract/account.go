@@ -46,12 +46,16 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
 				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.EACCOUNT_PARSE_FAIL, Message: "error parsing account task"})
-				ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+				if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
-				})
-				d.Nack(false, false)
+				}); err != nil {
+					continue
+				}
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
@@ -59,33 +63,45 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 				u, err := c.repo.GetUser(context.Background(), task.User)
 				if err == nil {
 					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.SUCCESS, Message: "user found", Detail: u})
-					ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+					if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
-					})
-					d.Ack(false)
+					}); err != nil {
+						continue
+					}
+					if err := d.Ack(false); err != nil {
+						continue
+					}
 					continue
 				}
 
 				if err == pgx.ErrNoRows {
 					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.EACCOUNT_NO_USER, Message: "user not found", Detail: task.User})
-					ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+					if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
-					})
-					d.Ack(false)
+					}); err != nil {
+						continue
+					}
+					if err := d.Ack(false); err != nil {
+						continue
+					}
 					continue
 				}
 
 				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.EACCOUNT_DB_ERR, Message: "something happen in our end", Detail: task.User})
-				ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+				if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
-				})
-				d.Ack(false)
+				}); err != nil {
+					continue
+				}
+				if err := d.Ack(false); err != nil {
+					continue
+				}
 			}
 		}
 	}()

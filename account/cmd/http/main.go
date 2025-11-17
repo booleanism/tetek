@@ -31,7 +31,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer mqCon.Close()
+	defer func() {
+		if err := mqCon.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	auth := contract.NewAuth(mqCon)
 
@@ -42,7 +46,11 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	app := fiber.New()
 	api := app.Group("/api/v0")

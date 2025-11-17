@@ -33,15 +33,19 @@ func SubscribeFeeds(con *amqp091.Connection, subcriberName string) *localFeedsCo
 }
 
 func (c *localFeedsContr) Publish(ctx context.Context, task amqp.FeedsTask) error {
-	corrId := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestId{}).(string)
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	c.mRes.Lock()
-	c.res[corrId] = make(chan *amqp.FeedsResult)
+	c.res[corrID] = make(chan *amqp.FeedsResult)
 	c.mRes.Unlock()
 
 	t, err := json.Marshal(&task)
@@ -50,7 +54,7 @@ func (c *localFeedsContr) Publish(ctx context.Context, task amqp.FeedsTask) erro
 	}
 
 	if err = ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_TASK_RK, false, false, amqp091.Publishing{
-		CorrelationId: corrId,
+		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
 	}); err != nil {
@@ -61,9 +65,9 @@ func (c *localFeedsContr) Publish(ctx context.Context, task amqp.FeedsTask) erro
 }
 
 func (c *localFeedsContr) Consume(ctx context.Context, res **amqp.FeedsResult) error {
-	corrId := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestId{}).(string)
 	c.mRes.Lock()
-	ch, ok := c.res[corrId]
+	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
 		return errors.New("no result with given correlation id")
@@ -74,7 +78,7 @@ func (c *localFeedsContr) Consume(ctx context.Context, res **amqp.FeedsResult) e
 		return errors.New("failed to consume feeds task")
 	case *res = <-ch:
 		c.mRes.Lock()
-		delete(c.res, corrId)
+		delete(c.res, corrID)
 		close(ch)
 		c.mRes.Unlock()
 
@@ -114,7 +118,9 @@ func (c *localFeedsContr) feedsResListener(name string) error {
 			c.mRes.Unlock()
 
 			if !ok {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
@@ -124,15 +130,21 @@ func (c *localFeedsContr) feedsResListener(name string) error {
 
 			var res amqp.FeedsResult
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			select {
 			case respCh <- &res:
-				d.Ack(false)
+				if err := d.Ack(false); err != nil {
+					continue
+				}
 			default:
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 			}
 		}
 	}()

@@ -30,6 +30,10 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 	select {}
 }

@@ -29,7 +29,11 @@ func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
 	if err != nil {
 		return err
 	}
-	defer ch.Close()
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	t, err := json.Marshal(&task)
 	if err != nil {
@@ -101,7 +105,9 @@ func (c *LocalAuthContr) authResListener() error {
 			c.mRes.Unlock()
 
 			if !ok {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
@@ -109,17 +115,23 @@ func (c *LocalAuthContr) authResListener() error {
 				continue
 			}
 
-			var res = amqp.AuthResult{}
+			res := amqp.AuthResult{}
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 				continue
 			}
 
 			select {
 			case respCh <- &res:
-				d.Ack(false)
+				if err := d.Ack(false); err != nil {
+					continue
+				}
 			default:
-				d.Nack(false, false)
+				if err := d.Nack(false, false); err != nil {
+					continue
+				}
 			}
 		}
 	}()
