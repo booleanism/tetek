@@ -1,0 +1,116 @@
+package repo
+
+import (
+	"context"
+
+	"github.com/booleanism/tetek/comments/internal/model"
+	"github.com/booleanism/tetek/db"
+	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/loggr"
+	"github.com/google/uuid"
+)
+
+const LIMIT = 30
+
+type CommentsRepo interface {
+	GetComments(context.Context, CommentFilter, *[]model.Comment) (int, error)
+	NewComment(context.Context, **model.Comment) error
+	Upvote(context.Context, CommentFilter) error
+}
+
+type CommentFilter struct {
+	Id     uuid.UUID
+	Head   uuid.UUID
+	By     string
+	Offset int
+}
+
+type commRepo struct {
+	db.Acquireable
+}
+
+func NewCommRepo(db db.Acquireable) commRepo {
+	return commRepo{db}
+}
+
+func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]model.Comment) (int, error) {
+	ctx, log := loggr.GetLogger(ctx, "repo/get-comments")
+	d, err := c.Acquire(ctx)
+	if err != nil {
+		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to acquire db pool", err)
+		log.Error(err, e.Error())
+		return 0, e
+	}
+	defer d.Release()
+
+	q := `
+	WITH RECURSIVE flat_comments AS (
+		SELECT id, parent, text, by, created_at 
+			FROM Comments
+				WHERE parent = $1 OR id = $1
+		UNION ALL
+		SELECT c.id, c.parent, c.text, c.by, c.created_at 
+			FROM Comments c 
+			JOIN flat_comments ct 
+				ON ct.id = c.parent
+	)
+	SELECT c.id, c.parent, c.text, c.by, COUNT(p.comments_id) AS points, c.created_at
+		FROM flat_comments c 
+		LEFT JOIN points p 
+			ON c.id = p.comments_id 
+		GROUP BY c.id, c.parent, c.text, c.by, c.created_at
+	LIMIT $2 OFFSET $3;`
+
+	rws, err := d.Query(ctx, q, ff.Head, LIMIT, ff.Offset)
+	if err != nil {
+		e := errro.FromError(errro.ECOMM_QUERY_ERR, "failed execute query", err)
+		log.Error(err, e.Error(), q, "$1", ff.Head, "$2", LIMIT, "$3", ff.Offset)
+		return 0, e
+	}
+
+	n := 0
+	for rws.Next() {
+		c := model.Comment{}
+		err := rws.Scan(&c.Id, &c.Parent, &c.Text, &c.By, &c.Points, &c.CreatedAt)
+		if err != nil {
+			e := errro.FromError(errro.ECOMM_SCAN_ERR, "error while scanning partial rows", err)
+			log.Error(err, e.Error(), "row-index", n)
+			return 0, e
+		}
+		n++
+		(*com) = append((*com), c)
+	}
+
+	err = rws.Err()
+	if err != nil {
+		e := errro.FromError(errro.ECOMM_SCAN_ERR, "found error after scanning", err)
+		log.Error(err, e.Error(), "rows", n)
+		return 0, e
+	}
+	return n, nil
+}
+
+func (c commRepo) NewComment(ctx context.Context, com **model.Comment) error {
+	ctx, log := loggr.GetLogger(ctx, "repo/new-comment")
+	d, err := c.Acquire(ctx)
+	if err != nil {
+		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to acquire db pool", err)
+		log.Error(err, e.Error())
+		return e
+	}
+	defer d.Release()
+
+	sql := `INSERT INTO comments (
+		id, parent, text, by, created_at
+	) VALUES ($1, $2, $3, $4, $5) RETURNING *`
+
+	r := d.QueryRow(ctx, sql, (*com).Id, (*com).Parent, (*com).Text, (*com).By, (*com).CreatedAt)
+	err = r.Scan(&(*com).Id, &(*com).Parent, &(*com).Text, &(*com).By, &(*com).CreatedAt)
+	if err != nil {
+		e := errro.FromError(errro.ECOMM_SCAN_ERR, "failed to scan inserted comment", err)
+		log.Error(err, "failed to scan inserted comment", "query", sql)
+		return e
+	}
+
+	return nil
+}

@@ -73,6 +73,8 @@ const (
 	ECOMM_PUB_FAIL        = -11
 	ECOMM_CONSUME_FAIL    = -12
 	ECOMM_NO_COMM         = EACCOUNT_NO_USER
+	ECOMM_DOWNVOTE_FAIL   = -16
+	ECOMM_UPVOTE_FAIL     = -17
 )
 
 type err struct {
