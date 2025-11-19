@@ -7,6 +7,7 @@ import (
 	"github.com/booleanism/tetek/auth/internal/contract"
 	"github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/auth/recipes"
+	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -44,7 +45,7 @@ func main() {
 		}
 	}()
 
-	accContr := contract.NewAccount(mqCon)
+	accContr := contracts.SubscribeAccount(mqCon, "auth")
 	logRec := recipes.NewLogin(accContr, jwt)
 
 	app := fiber.New()

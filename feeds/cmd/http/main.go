@@ -11,7 +11,6 @@ import (
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/contracts"
-	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
@@ -57,7 +56,7 @@ func main() {
 	d, ui := docs.OapiDocs(apiEp, docs.Feeds, endp)
 
 	apiEp.Use(cors.New())
-	apiEp.Use(helper.GenerateRequestId)
+	apiEp.Use(middlewares.GenerateRequestID)
 
 	apiEp.Get("openapi.yaml", func(ctx fiber.Ctx) error {
 		return ctx.SendString(d())
