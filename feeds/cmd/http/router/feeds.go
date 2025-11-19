@@ -34,7 +34,7 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 
 	f, err := fr.rec.Feeds(cto, req)
 	if err == nil {
-		gRes.Code = errro.SUCCESS
+		gRes.Code = errro.Success
 		gRes.Message = "fetch feeds success"
 		res := recipes.GetFeedsResponse{
 			GenericResponse: gRes,
@@ -43,13 +43,13 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 		return ctx.Status(fiber.StatusOK).JSON(&res)
 	}
 
-	if err.Code() == errro.EFEEDS_NO_FEEDS {
+	if err.Code() == errro.ErrFeedsNoFeeds {
 		gRes.Code = err.Code()
 		gRes.Message = err.Error()
 		return ctx.Status(fiber.StatusNotFound).JSON(&gRes)
 	}
 
-	gRes.Code = errro.EFEEDS_DB_ERR
+	gRes.Code = errro.ErrFeedsDBError
 	gRes.Message = "fail to fetch feeds"
-	return err.WithDetail(gRes.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+	return err.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 }

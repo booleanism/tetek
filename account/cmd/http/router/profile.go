@@ -19,7 +19,7 @@ type profileResponse struct {
 	Detail model.User `json:"detail"`
 }
 
-func (r profileResponse) Json() []byte {
+func (r profileResponse) JSON() []byte {
 	j, _ := json.Marshal(r)
 	return j
 }
@@ -33,16 +33,16 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 
 		if req.Uname == "" {
 			res := helper.GenericResponse{
-				Code:    errro.EACCOUNT_EMPTY_PARAM,
+				Code:    errro.ErrAccountEmptyParam,
 				Message: "uname empty",
 			}
 			e := errro.New(res.Code, res.Message)
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
+			return e.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		u, err := rec.Profile(ctx.Context(), model.User{Uname: req.Uname})
 		if err != nil {
-			if err.Code() == errro.EACCOUNT_NO_USER {
+			if err.Code() == errro.ErrAccountNoUser {
 				res := profileResponse{
 					GenericResponse: helper.GenericResponse{
 						Code:    err.Code(),
@@ -50,22 +50,22 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 					},
 					Detail: model.User{Uname: req.Uname},
 				}
-				return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusNotFound)
+				return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusNotFound)
 			}
 
 			res := profileResponse{
 				GenericResponse: helper.GenericResponse{
-					Code:    errro.EACCOUNT_DB_ERR,
+					Code:    errro.ErrAccountDBError,
 					Message: "something happen in our end",
 				},
 				Detail: model.User{Uname: req.Uname},
 			}
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 		}
 
 		res := profileResponse{
 			GenericResponse: helper.GenericResponse{
-				Code:    errro.SUCCESS,
+				Code:    errro.Success,
 				Message: "user profiling success",
 			},
 			Detail: u,

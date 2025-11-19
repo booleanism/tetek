@@ -53,7 +53,7 @@ func (c *localFeedsContr) Publish(ctx context.Context, task amqp.FeedsTask) erro
 		return err
 	}
 
-	if err = ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_TASK_RK, false, false, amqp091.Publishing{
+	if err = ch.Publish(amqp.FeedsExchange, amqp.FeedsTaskRk, false, false, amqp091.Publishing{
 		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
@@ -101,7 +101,7 @@ func (c *localFeedsContr) feedsResListener(name string) error {
 		return err
 	}
 
-	err = ch.QueueBind(q.Name, amqp.FEEDS_RES_RK, amqp.FEEDS_EXCHANGE, false, nil)
+	err = ch.QueueBind(q.Name, amqp.FeedsResRk, amqp.FeedsExchange, false, nil)
 	if err != nil {
 		return err
 	}

@@ -23,7 +23,7 @@ type loginResponse struct {
 	Detail  loginRequest `json:"detail"`
 }
 
-func (r loginResponse) Json() []byte {
+func (r loginResponse) JSON() []byte {
 	j, _ := json.Marshal(r)
 	return j
 }
@@ -46,7 +46,7 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 		jwt, err := logRec.Login(req.toUser())
 		if err == nil {
 			res := loginResponse{
-				Code:    errro.SUCCESS,
+				Code:    errro.Success,
 				Message: "login success",
 				Detail: loginRequest{
 					Uname: req.Uname,
@@ -62,27 +62,27 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 			Message: err.Error(),
 			Detail:  req,
 		}
-		if err.Code() == errro.EAUTH_JWT_GENERATAION_FAIL || err.Code() == errro.EACCOUNT_SERVICE_UNAVAILABLE {
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+		if err.Code() == errro.ErrAuthJWTGenerationFail || err.Code() == errro.ErrAccountServiceUnavailable {
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 		}
 
-		if err.Code() == errro.EACCOUNT_NO_USER {
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusNotFound)
+		if err.Code() == errro.ErrAccountNoUser {
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusNotFound)
 		}
 
-		if err.Code() == errro.EAUTH_INVALID_LOGIN_PARAM {
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusExpectationFailed)
+		if err.Code() == errro.ErrAuthInvalidLoginParam {
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusExpectationFailed)
 		}
 
-		if err.Code() == errro.EAUTH_INVALID_CREDS {
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
+		if err.Code() == errro.ErrAuthInvalidCreds {
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
 		res = loginResponse{
-			Code:    errro.EACCOUNT_CANT_LOGIN,
+			Code:    errro.ErrAccountCantLogin,
 			Message: "failed to proccess login request",
 			Detail:  req,
 		}
-		return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+		return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

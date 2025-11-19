@@ -7,7 +7,7 @@ import (
 )
 
 type Comment struct {
-	Id        uuid.UUID  `json:"id"`
+	ID        uuid.UUID  `json:"id"`
 	Parent    uuid.UUID  `json:"parent"`
 	Text      string     `json:"text"`
 	By        string     `json:"by"`

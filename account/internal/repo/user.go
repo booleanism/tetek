@@ -32,7 +32,7 @@ func (r *userRepo) GetUser(ctx context.Context, user model.User) (u model.User, 
 		ctx,
 		"SELECT id, uname, email, passwd, role, created_at FROM users WHERE uname = $1 OR email = $2;",
 		user.Uname, user.Email,
-	).Scan(&u.Id, &u.Uname, &u.Email, &u.Passwd, &u.Role, &u.CreatedAt)
+	).Scan(&u.ID, &u.Uname, &u.Email, &u.Passwd, &u.Role, &u.CreatedAt)
 
 	return
 }
@@ -48,8 +48,8 @@ func (r *userRepo) NewUser(ctx context.Context, user model.User) (u model.User, 
 	err = c.QueryRow(
 		ctx,
 		"INSERT INTO users (id, uname, email, passwd, role, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *;",
-		user.Id, user.Uname, user.Email, user.Passwd, user.Role, user.CreatedAt,
-	).Scan(&u.Id, &u.Uname, &u.Email, &u.Passwd, &u.Role, &u.CreatedAt)
+		user.ID, user.Uname, user.Email, user.Passwd, user.Role, user.CreatedAt,
+	).Scan(&u.ID, &u.Uname, &u.Email, &u.Passwd, &u.Role, &u.CreatedAt)
 
 	return
 }

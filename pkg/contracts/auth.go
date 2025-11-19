@@ -53,7 +53,7 @@ func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error 
 	c.res[corrID] = make(chan *amqp.AuthResult, 1)
 	c.mRes.Unlock()
 
-	if err = ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_TASK_RK, false, false, amqp091.Publishing{
+	if err = ch.Publish(amqp.AuthExchange, amqp.AuthTaskRk, false, false, amqp091.Publishing{
 		CorrelationId: corrID,
 		Body:          t,
 		ContentType:   "text/json",
@@ -101,7 +101,7 @@ func (c *localAuthContr) authResListener(name string) error {
 		return err
 	}
 
-	err = ch.QueueBind(q.Name, amqp.AUTH_RES_RK, amqp.AUTH_EXCHANGE, false, nil)
+	err = ch.QueueBind(q.Name, amqp.AuthResRk, amqp.AuthExchange, false, nil)
 	if err != nil {
 		return err
 	}

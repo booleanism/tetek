@@ -31,7 +31,7 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 		return nil, err
 	}
 
-	mgs, err := ch.Consume(amqp.ACCOUNT_TASK_QUEUE, "", false, false, false, false, nil)
+	mgs, err := ch.Consume(amqp.AccountTaskQueue, "", false, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -45,8 +45,8 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 			task := amqp.AccountTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.EACCOUNT_PARSE_FAIL, Message: "error parsing account task"})
-				if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountParseFail, Message: "error parsing account task"})
+				if err := ch.Publish(amqp.AccountExchange, amqp.AccountResRk, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
@@ -62,8 +62,8 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 			if task.Cmd == 0 {
 				u, err := c.repo.GetUser(context.Background(), task.User)
 				if err == nil {
-					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.SUCCESS, Message: "user found", Detail: u})
-					if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.Success, Message: "user found", Detail: u})
+					if err := ch.Publish(amqp.AccountExchange, amqp.AccountResRk, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
@@ -77,8 +77,8 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 				}
 
 				if err == pgx.ErrNoRows {
-					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.EACCOUNT_NO_USER, Message: "user not found", Detail: task.User})
-					if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountNoUser, Message: "user not found", Detail: task.User})
+					if err := ch.Publish(amqp.AccountExchange, amqp.AccountResRk, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
@@ -91,8 +91,8 @@ func (c *AccContr) WorkerAccountListener() (*amqp091.Channel, error) {
 					continue
 				}
 
-				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.EACCOUNT_DB_ERR, Message: "something happen in our end", Detail: task.User})
-				if err := ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_RES_RK, false, false, amqp091.Publishing{
+				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountDBError, Message: "something happen in our end", Detail: task.User})
+				if err := ch.Publish(amqp.AccountExchange, amqp.AccountResRk, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",

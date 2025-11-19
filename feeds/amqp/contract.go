@@ -8,13 +8,13 @@ import (
 type Feeds = model.Feed
 
 const (
-	FEEDS_EXCHANGE       = "x_feeds"
-	FEEDS_TASK_QUEUE     = "task_feeds"
-	FEEDS_TASK_RK        = "task.feeds.*"
-	FEEDS_RES_QUEUE      = "res_feeds"
-	FEEDS_RES_RK         = "res.feeds.*"
-	DLX_FEEDS_EXCHANGE   = "dlx_feeds"
-	DLQ_FEEDS_TASK_QUEUE = "dlq_task_feeds"
+	FeedsExchange     = "x_feeds"
+	FeedsTaskQueue    = "task_feeds"
+	FeedsTaskRk       = "task.feeds.*"
+	FeedsResQueue     = "res_feeds"
+	FeedsResRk        = "res.feeds.*"
+	DlxFeedsExchange  = "dlx_feeds"
+	DlqFeedsTaskQueue = "dlq_task_feeds"
 )
 
 type FeedsTask struct {
@@ -29,12 +29,12 @@ type FeedsResult struct {
 }
 
 func FeedsSetup(ch *amqp091.Channel) error {
-	err := ch.ExchangeDeclare(FEEDS_EXCHANGE, "topic", true, false, false, false, nil)
+	err := ch.ExchangeDeclare(FeedsExchange, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.ExchangeDeclare(DLX_FEEDS_EXCHANGE, "fanout", true, false, false, false, nil)
+	err = ch.ExchangeDeclare(DlxFeedsExchange, "fanout", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -44,25 +44,25 @@ func FeedsSetup(ch *amqp091.Channel) error {
 		return err
 	}
 
-	_, err = ch.QueueDeclare(DLQ_FEEDS_TASK_QUEUE, true, false, false, false, nil)
+	_, err = ch.QueueDeclare(DlqFeedsTaskQueue, true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(DLQ_FEEDS_TASK_QUEUE, "", DLX_FEEDS_EXCHANGE, false, nil)
+	err = ch.QueueBind(DlqFeedsTaskQueue, "", DlxFeedsExchange, false, nil)
 	if err != nil {
 		return err
 	}
 
-	qTask, err := ch.QueueDeclare(FEEDS_TASK_QUEUE, true, false, false, false, amqp091.Table{
-		"x-dead-letter-exchange": DLX_FEEDS_EXCHANGE,
+	qTask, err := ch.QueueDeclare(FeedsTaskQueue, true, false, false, false, amqp091.Table{
+		"x-dead-letter-exchange": DlxFeedsExchange,
 		"x-message-ttl":          int32(5000),
 	})
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(qTask.Name, FEEDS_TASK_RK, FEEDS_EXCHANGE, false, nil)
+	err = ch.QueueBind(qTask.Name, FeedsTaskRk, FeedsExchange, false, nil)
 	if err != nil {
 		return err
 	}

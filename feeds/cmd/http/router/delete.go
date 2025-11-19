@@ -21,9 +21,9 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 
 	jwt, ok := ctx.Context().Value(keystore.AuthRes{}).(*amqp.AuthResult)
 	if !ok {
-		gRes.Code = errro.EAUTH_INVALID_AUTH_RESULT_TYPE
+		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "missing jwt"
-		e := errro.New(gRes.Code, "does not represent jwt type").WithDetail(gRes.Json(), errro.TDETAIL_JSON)
+		e := errro.New(gRes.Code, "does not represent jwt type").WithDetail(gRes.JSON(), errro.TDetailJSON)
 		return e.SendError(ctx, fiber.StatusUnauthorized)
 	}
 
@@ -32,20 +32,20 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 
 	err := fr.rec.Delete(cto, req)
 	if err == nil {
-		gRes.Code = errro.SUCCESS
+		gRes.Code = errro.Success
 		gRes.Message = "feed deleted"
 		res := recipes.DeleteResponse{GenericResponse: gRes, Detail: req}
 		return ctx.Status(fiber.StatusAccepted).JSON(&res)
 	}
 
-	if err.Code() == errro.EFEEDS_NO_FEEDS && jwt.Claims.Uname != "" {
-		gRes.Code = errro.EFEEDS_DELETE_FAIL
+	if err.Code() == errro.ErrFeedsNoFeeds && jwt.Claims.Uname != "" {
+		gRes.Code = errro.ErrFeedsDeleteFail
 		gRes.Message = "unauthorized user to performe this action"
 		return ctx.Status(fiber.StatusUnauthorized).JSON(&gRes)
 	}
 
-	if err.Code() == errro.EFEEDS_NO_FEEDS {
-		gRes.Code = errro.EFEEDS_DELETE_FAIL
+	if err.Code() == errro.ErrFeedsNoFeeds {
+		gRes.Code = errro.ErrFeedsDeleteFail
 		gRes.Message = err.Error()
 		return ctx.Status(fiber.StatusInternalServerError).JSON(&gRes)
 	}

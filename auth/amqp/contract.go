@@ -6,13 +6,13 @@ import (
 )
 
 const (
-	AUTH_EXCHANGE       = "x_auth"
-	AUTH_TASK_QUEUE     = "task_auth"
-	AUTH_TASK_RK        = "task.auth.*"
-	AUTH_RES_QUEUE      = "res_auth"
-	AUTH_RES_RK         = "res.auth.*"
-	DLX_AUTH_EXCHANGE   = "dlx_auth"
-	DLQ_AUTH_TASK_QUEUE = "dlq_task_auth"
+	AuthExchange     = "x_auth"
+	AuthTaskQueue    = "task_auth"
+	AuthTaskRk       = "task.auth.*"
+	AuthResQueue     = "res_auth"
+	AuthResRk        = "res.auth.*"
+	DlxAuthExchange  = "dlx_auth"
+	DlqAuthTaskQueue = "dlq_task_auth"
 )
 
 type AuthTask struct {
@@ -26,12 +26,12 @@ type AuthResult struct {
 }
 
 func AuthSetup(ch *amqp091.Channel) error {
-	err := ch.ExchangeDeclare(AUTH_EXCHANGE, "topic", true, false, false, false, nil)
+	err := ch.ExchangeDeclare(AuthExchange, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.ExchangeDeclare(DLX_AUTH_EXCHANGE, "fanout", true, false, false, false, nil)
+	err = ch.ExchangeDeclare(DlxAuthExchange, "fanout", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -41,25 +41,25 @@ func AuthSetup(ch *amqp091.Channel) error {
 		return err
 	}
 
-	_, err = ch.QueueDeclare(DLQ_AUTH_TASK_QUEUE, true, false, false, false, nil)
+	_, err = ch.QueueDeclare(DlqAuthTaskQueue, true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(DLQ_AUTH_TASK_QUEUE, "", DLX_AUTH_EXCHANGE, false, nil)
+	err = ch.QueueBind(DlqAuthTaskQueue, "", DlxAuthExchange, false, nil)
 	if err != nil {
 		return err
 	}
 
-	qTask, err := ch.QueueDeclare(AUTH_TASK_QUEUE, true, false, false, false, amqp091.Table{
-		"x-dead-letter-exchange": DLX_AUTH_EXCHANGE,
+	qTask, err := ch.QueueDeclare(AuthTaskQueue, true, false, false, false, amqp091.Table{
+		"x-dead-letter-exchange": DlxAuthExchange,
 		"x-message-ttl":          int32(5000),
 	})
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(qTask.Name, AUTH_TASK_RK, AUTH_EXCHANGE, false, nil)
+	err = ch.QueueBind(qTask.Name, AuthTaskRk, AuthExchange, false, nil)
 	if err != nil {
 		return err
 	}
