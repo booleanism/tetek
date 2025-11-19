@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/booleanism/tetek/account/cmd/http/router"
@@ -10,11 +11,23 @@ import (
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
+	"github.com/booleanism/tetek/pkg/loggr"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zerologr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog"
+)
+
+const (
+	LogV        = 3
+	ServiceName = "account"
 )
 
 func main() {
+	zl := zerolog.New(os.Stderr)
+	zerologr.SetMaxV(LogV)
+
 	dbStr := os.Getenv("ACCOUNT_DB_STR")
 	if dbStr == "" {
 		panic("database connection string empty")
@@ -38,12 +51,15 @@ func main() {
 		}
 	}()
 
-	auth := contracts.SubsribeAuth(mqCon, "account")
+	auth := contracts.SubsribeAuth(mqCon, ServiceName)
 
 	rep := repo.NewUserRepo(dbPool)
 	rec := recipes.New(rep)
 	acc := contract.NewAccount(mqCon, rep)
-	ch, err := acc.WorkerAccountListener()
+
+	workerCtx := context.Background()
+	workerCtx = logr.NewContext(workerCtx, loggr.NewLogger(ServiceName, &zl))
+	ch, err := acc.WorkerAccountListener(workerCtx)
 	if err != nil {
 		panic(err)
 	}
@@ -56,6 +72,8 @@ func main() {
 	app := fiber.New()
 	api := app.Group("/api/v0")
 	{
+		api.Use(middlewares.GenerateRequestID)
+		api.Use(middlewares.Logger(ServiceName, &zl))
 		api.Post("/", router.Regist(rec))
 		api.Get("/:uname", middlewares.Auth(auth), router.Profile(rec))
 	}

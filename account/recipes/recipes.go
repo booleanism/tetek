@@ -17,14 +17,14 @@ type recipes struct {
 	repo repo.UserRepo
 }
 
-func New(repo repo.UserRepo) *recipes {
-	return &recipes{repo}
+func New(repo repo.UserRepo) recipes {
+	return recipes{repo}
 }
 
-func (r *recipes) Profile(ctx context.Context, user model.User) (model.User, errro.Error) {
+func (r recipes) Profile(ctx context.Context, user model.User) (model.User, errro.Error) {
 	return (&profileRecipe{r.repo}).Profile(ctx, user)
 }
 
-func (r *recipes) Regist(ctx context.Context, user model.User) errro.Error {
+func (r recipes) Regist(ctx context.Context, user model.User) errro.Error {
 	return (&registRecipes{r.repo}).Regist(ctx, user)
 }

@@ -1,75 +1,51 @@
 package router
 
 import (
-	"encoding/json"
-
 	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
-type profileRequest struct {
-	Uname string `uri:"uname"`
-}
-
-type profileResponse struct {
-	helper.GenericResponse
-	Detail model.User `json:"detail"`
-}
-
-func (r profileResponse) JSON() []byte {
-	j, _ := json.Marshal(r)
-	return j
-}
-
 func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		req := profileRequest{}
+		_, log := loggr.GetLogger(ctx.Context(), "profile-handler")
+		gRes := helper.GenericResponse{}
+		req := recipes.ProfileRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
+			log.V(1).Info("failed to bind request", "error", err)
 			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		if req.Uname == "" {
-			res := helper.GenericResponse{
-				Code:    errro.ErrAccountEmptyParam,
-				Message: "uname empty",
-			}
-			e := errro.New(res.Code, res.Message)
-			return e.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
+			gRes.Code = errro.ErrAccountEmptyParam
+			gRes.Message = "uname empty"
+			e := errro.New(gRes.Code, gRes.Message)
+			return e.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		u, err := rec.Profile(ctx.Context(), model.User{Uname: req.Uname})
-		if err != nil {
-			if err.Code() == errro.ErrAccountNoUser {
-				res := profileResponse{
-					GenericResponse: helper.GenericResponse{
-						Code:    err.Code(),
-						Message: "user not found",
-					},
-					Detail: model.User{Uname: req.Uname},
-				}
-				return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusNotFound)
-			}
-
-			res := profileResponse{
+		if err == nil {
+			res := recipes.ProfileResponse{
 				GenericResponse: helper.GenericResponse{
-					Code:    errro.ErrAccountDBError,
-					Message: "something happen in our end",
+					Code:    errro.Success,
+					Message: "user profiling success",
 				},
-				Detail: model.User{Uname: req.Uname},
+				Detail: u,
 			}
-			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
+			return ctx.Status(fiber.StatusOK).JSON(res)
 		}
 
-		res := profileResponse{
-			GenericResponse: helper.GenericResponse{
-				Code:    errro.Success,
-				Message: "user profiling success",
-			},
-			Detail: u,
+		if err.Code() == errro.ErrAccountNoUser {
+			gRes.Code = errro.ErrAccountEmptyParam
+			gRes.Message = "user not found"
+			return err.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusNotFound)
 		}
-		return ctx.Status(fiber.StatusOK).JSON(res)
+
+		gRes.Code = errro.ErrAccountDBError
+		gRes.Message = "something happen in our end"
+		return err.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

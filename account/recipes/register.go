@@ -8,6 +8,7 @@ import (
 	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
@@ -22,8 +23,10 @@ type registRecipes struct {
 }
 
 func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error {
+	ctx, log := loggr.GetLogger(ctx, "recipes/Regist")
 	if user.Uname == "" || user.Email == "" || user.Passwd == "" {
 		e := errro.New(errro.ErrAccountInvalidRegistParam, "uname, email or passwd should not empty")
+		log.V(1).Info("missing user property", "user", user)
 		return e
 	}
 
@@ -45,7 +48,8 @@ func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error
 
 	passwd, err := bcrypt.GenerateFromPassword([]byte(user.Passwd), bcrypt.DefaultCost)
 	if err != nil {
-		e := errro.New(errro.ErrAccountPasswdHashFail, "failed to hash passwd")
+		e := errro.FromError(errro.ErrAccountPasswdHashFail, "failed to hash passwd", err)
+		log.V(1).Info("failed to hash passwd", "user", user, "error", err)
 		return e
 	}
 
@@ -63,12 +67,12 @@ func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error
 		pgErr := &pgconn.PgError{}
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
-				e := errro.New(errro.ErrAccountUserAlreadyExist, "user already exist")
+				e := errro.FromError(errro.ErrAccountUserAlreadyExist, "user already exist", pgErr)
 				return e
 			}
 		}
 
-		e := errro.New(errro.ErrAccountDBError, "error happen with database interaction")
+		e := errro.FromError(errro.ErrAccountDBError, "error happen with our database", err)
 		return e
 	}
 
