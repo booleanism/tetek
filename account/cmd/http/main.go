@@ -3,12 +3,13 @@ package main
 import (
 	"os"
 
-	"github.com/booleanism/tetek/account/cmd/http/middleware"
 	"github.com/booleanism/tetek/account/cmd/http/router"
 	"github.com/booleanism/tetek/account/internal/contract"
 	"github.com/booleanism/tetek/account/internal/repo"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/db"
+	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -37,7 +38,7 @@ func main() {
 		}
 	}()
 
-	auth := contract.NewAuth(mqCon)
+	auth := contracts.SubsribeAuth(mqCon, "account")
 
 	rep := repo.NewUserRepo(dbPool)
 	rec := recipes.New(rep)
@@ -56,7 +57,7 @@ func main() {
 	api := app.Group("/api/v0")
 	{
 		api.Post("/", router.Regist(rec))
-		api.Get("/:uname", middleware.Auth(auth), router.Profile(rec))
+		api.Get("/:uname", middlewares.Auth(auth), router.Profile(rec))
 	}
 
 	if err := app.Listen(":8082"); err != nil {
