@@ -24,7 +24,7 @@ func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
 
 	err := fr.rec.New(cto, req)
 	if err == nil {
-		gRes.Code = errro.SUCCESS
+		gRes.Code = errro.Success
 		gRes.Message = "success add new feed"
 		res := recipes.NewFeedResponse{
 			GenericResponse: gRes,
@@ -33,12 +33,12 @@ func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
 		return ctx.Status(fiber.StatusCreated).JSON(&res)
 	}
 
-	gRes.Code = errro.EFEEDS_NEW_FAIL
+	gRes.Code = errro.ErrFeedsNewFail
 	gRes.Message = "failed to create new feed"
 	res := recipes.NewFeedResponse{
 		GenericResponse: gRes,
 		Detail:          req,
 	}
-	e := errro.New(res.Code, res.Message).WithDetail(res.Json(), errro.TDETAIL_JSON)
+	e := errro.New(res.Code, res.Message).WithDetail(res.JSON(), errro.TDetailJSON)
 	return e.SendError(ctx, fiber.StatusInternalServerError)
 }

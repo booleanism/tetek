@@ -13,7 +13,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
-const Timeout = 5
+const Timeout = 5 * time.Minute
 
 func (cr commRouter) NewComment(ctx fiber.Ctx) error {
 	c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
@@ -28,14 +28,14 @@ func (cr commRouter) NewComment(ctx fiber.Ctx) error {
 
 	_, ok := c.Value(keystore.AuthRes{}).(*amqp.AuthResult)
 	if !ok {
-		gRes.Code = errro.EAUTH_EMPTY_JWT
+		gRes.Code = errro.ErrAuthEmptyJWT
 		gRes.Message = "empty jwt"
 		e := errro.New(gRes.Code, gRes.Message)
 		log.V(1).Info(e.Error())
-		return e.WithJson(gRes).SendError(ctx, fiber.StatusBadRequest)
+		return e.WithJSON(gRes).SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	cto, cancel := context.WithTimeout(c, Timeout*time.Minute)
+	cto, cancel := context.WithTimeout(c, Timeout)
 	defer cancel()
 
 	com, err := cr.r.NewComment(cto, req)
@@ -45,7 +45,7 @@ func (cr commRouter) NewComment(ctx fiber.Ctx) error {
 		return ctx.Status(fiber.StatusInternalServerError).JSON(&gRes)
 	}
 
-	gRes.Code = errro.SUCCESS
+	gRes.Code = errro.Success
 	gRes.Message = "success adding comment"
 	res := recipes.NewCommentResponse{GenericResponse: gRes, Detail: com}
 	return ctx.Status(fiber.StatusOK).JSON(&res)

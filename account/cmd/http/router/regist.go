@@ -21,7 +21,7 @@ type registResponse struct {
 	Detail registRequest `json:"detail"`
 }
 
-func (r registResponse) Json() []byte {
+func (r registResponse) JSON() []byte {
 	j, _ := json.Marshal(r)
 	return j
 }
@@ -41,13 +41,13 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 
 		if err == nil {
 			res := helper.GenericResponse{
-				Code:    errro.SUCCESS,
+				Code:    errro.Success,
 				Message: "register success",
 			}
 			return ctx.Status(fiber.StatusOK).JSON(&res)
 		}
 
-		if err.Code() == errro.EACCOUNT_USER_ALREADY_EXIST {
+		if err.Code() == errro.ErrAccountUserAlreadyExist {
 			res := registResponse{
 				GenericResponse: helper.GenericResponse{
 					Code:    err.Code(),
@@ -56,10 +56,10 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				Detail: req,
 			}
 
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusConflict)
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusConflict)
 		}
 
-		if err.Code() == errro.EACCOUNT_INVALID_REGIST_PARAM {
+		if err.Code() == errro.ErrAccountInvalidRegistParam {
 			res := registResponse{
 				GenericResponse: helper.GenericResponse{
 					Code:    err.Code(),
@@ -68,16 +68,16 @@ func Regist(rec recipes.RegistRecipes) fiber.Handler {
 				Detail: req,
 			}
 
-			return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
+			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		res := registResponse{
 			GenericResponse: helper.GenericResponse{
-				Code:    errro.EACCOUNT_REGIST_FAIL,
+				Code:    errro.ErrAccountRegistFail,
 				Message: "cannot create user",
 			},
 			Detail: req,
 		}
-		return err.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+		return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 }

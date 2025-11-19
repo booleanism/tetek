@@ -24,10 +24,10 @@ func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
 	err := ctx.Bind().All(req)
 	if err != nil {
 		r := &GenericResponse{
-			Code:    errro.INVALID_REQ,
+			Code:    errro.ErrInvalidRequest,
 			Message: "malformat request, failed to bind the request",
 		}
-		return errro.New(errro.INVALID_REQ, "malformat request, failed to bind the request").WithDetail(r.Json(), errro.TDETAIL_JSON)
+		return errro.New(errro.ErrInvalidRequest, "malformat request, failed to bind the request").WithDetail(r.Json(), errro.TDetailJSON)
 	}
 	return nil
 }

@@ -23,11 +23,11 @@ type registRecipes struct {
 
 func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error {
 	if user.Uname == "" || user.Email == "" || user.Passwd == "" {
-		e := errro.New(errro.EACCOUNT_INVALID_REGIST_PARAM, "uname, email or passwd should not empty")
+		e := errro.New(errro.ErrAccountInvalidRegistParam, "uname, email or passwd should not empty")
 		return e
 	}
 
-	id := user.Id
+	id := user.ID
 	if id == "" {
 		id = uuid.NewString()
 	}
@@ -45,12 +45,12 @@ func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error
 
 	passwd, err := bcrypt.GenerateFromPassword([]byte(user.Passwd), bcrypt.DefaultCost)
 	if err != nil {
-		e := errro.New(errro.EACCOUNT_PASSWD_HASH_FAIL, "failed to hash passwd")
+		e := errro.New(errro.ErrAccountPasswdHashFail, "failed to hash passwd")
 		return e
 	}
 
 	user = model.User{
-		Id:        id,
+		ID:        id,
 		Uname:     user.Uname,
 		Email:     user.Email,
 		Passwd:    string(passwd),
@@ -63,12 +63,12 @@ func (r *registRecipes) Regist(ctx context.Context, user model.User) errro.Error
 		pgErr := &pgconn.PgError{}
 		if errors.As(err, &pgErr) {
 			if pgErr.Code == "23505" {
-				e := errro.New(errro.EACCOUNT_USER_ALREADY_EXIST, "user already exist")
+				e := errro.New(errro.ErrAccountUserAlreadyExist, "user already exist")
 				return e
 			}
 		}
 
-		e := errro.New(errro.EACCOUNT_DB_ERR, "error happen with database interaction")
+		e := errro.New(errro.ErrAccountDBError, "error happen with database interaction")
 		return e
 	}
 

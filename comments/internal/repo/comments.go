@@ -19,7 +19,7 @@ type CommentsRepo interface {
 }
 
 type CommentFilter struct {
-	Id     uuid.UUID
+	ID     uuid.UUID
 	Head   uuid.UUID
 	By     string
 	Offset int
@@ -37,7 +37,7 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 	ctx, log := loggr.GetLogger(ctx, "repo/get-comments")
 	d, err := c.Acquire(ctx)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to acquire db pool", err)
+		e := errro.FromError(errro.ErrCommDBError, "failed to acquire db pool", err)
 		log.Error(err, e.Error())
 		return 0, e
 	}
@@ -63,7 +63,7 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 
 	rws, err := d.Query(ctx, q, ff.Head, LIMIT, ff.Offset)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_QUERY_ERR, "failed execute query", err)
+		e := errro.FromError(errro.ErrCommQueryError, "failed execute query", err)
 		log.Error(err, e.Error(), q, "$1", ff.Head, "$2", LIMIT, "$3", ff.Offset)
 		return 0, e
 	}
@@ -71,9 +71,9 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 	n := 0
 	for rws.Next() {
 		c := model.Comment{}
-		err := rws.Scan(&c.Id, &c.Parent, &c.Text, &c.By, &c.Points, &c.CreatedAt)
+		err := rws.Scan(&c.ID, &c.Parent, &c.Text, &c.By, &c.Points, &c.CreatedAt)
 		if err != nil {
-			e := errro.FromError(errro.ECOMM_SCAN_ERR, "error while scanning partial rows", err)
+			e := errro.FromError(errro.ErrCommScanError, "error while scanning partial rows", err)
 			log.Error(err, e.Error(), "row-index", n)
 			return 0, e
 		}
@@ -83,7 +83,7 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 
 	err = rws.Err()
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_SCAN_ERR, "found error after scanning", err)
+		e := errro.FromError(errro.ErrCommScanError, "found error after scanning", err)
 		log.Error(err, e.Error(), "rows", n)
 		return 0, e
 	}
@@ -94,7 +94,7 @@ func (c commRepo) NewComment(ctx context.Context, com **model.Comment) error {
 	ctx, log := loggr.GetLogger(ctx, "repo/new-comment")
 	d, err := c.Acquire(ctx)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to acquire db pool", err)
+		e := errro.FromError(errro.ErrCommDBError, "failed to acquire db pool", err)
 		log.Error(err, e.Error())
 		return e
 	}
@@ -104,10 +104,10 @@ func (c commRepo) NewComment(ctx context.Context, com **model.Comment) error {
 		id, parent, text, by, created_at
 	) VALUES ($1, $2, $3, $4, $5) RETURNING *`
 
-	r := d.QueryRow(ctx, sql, (*com).Id, (*com).Parent, (*com).Text, (*com).By, (*com).CreatedAt)
-	err = r.Scan(&(*com).Id, &(*com).Parent, &(*com).Text, &(*com).By, &(*com).CreatedAt)
+	r := d.QueryRow(ctx, sql, (*com).ID, (*com).Parent, (*com).Text, (*com).By, (*com).CreatedAt)
+	err = r.Scan(&(*com).ID, &(*com).Parent, &(*com).Text, &(*com).By, &(*com).CreatedAt)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_SCAN_ERR, "failed to scan inserted comment", err)
+		e := errro.FromError(errro.ErrCommScanError, "failed to scan inserted comment", err)
 		log.Error(err, "failed to scan inserted comment", "query", sql)
 		return e
 	}

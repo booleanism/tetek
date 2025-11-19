@@ -57,7 +57,7 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 		return err
 	}
 
-	if err = ch.Publish(amqp.ACCOUNT_EXCHANGE, amqp.ACCOUNT_TASK_RK, false, false, amqp091.Publishing{
+	if err = ch.Publish(amqp.AccountExchange, amqp.AccountTaskRk, false, false, amqp091.Publishing{
 		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
@@ -105,7 +105,7 @@ func (c *localAccContr) accountResListener(name string) error {
 		return err
 	}
 
-	err = ch.QueueBind(q.Name, amqp.ACCOUNT_RES_RK, amqp.ACCOUNT_EXCHANGE, false, nil)
+	err = ch.QueueBind(q.Name, amqp.AccountResRk, amqp.AccountExchange, false, nil)
 	if err != nil {
 		return err
 	}

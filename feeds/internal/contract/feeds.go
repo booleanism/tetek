@@ -32,7 +32,7 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 		return nil, err
 	}
 
-	mgs, err := ch.Consume(amqp.FEEDS_TASK_QUEUE, "", false, false, false, false, nil)
+	mgs, err := ch.Consume(amqp.FeedsTaskQueue, "", false, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +46,8 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 			task := amqp.FeedsTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.EFEEDS_PARSE_FAIL, Message: "error parsing feeds task"})
-				if err := ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
+				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsParseFail, Message: "error parsing feeds task"})
+				if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
@@ -61,11 +61,11 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 			}
 
 			if task.Cmd == 0 {
-				ff := repo.FeedsFilter{Id: task.Id}
+				ff := repo.FeedsFilter{ID: task.ID}
 				u, err := c.repo.Feeds(context.Background(), ff)
 				if err == nil {
-					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.SUCCESS, Message: "feeds found", Detail: u[len(u)-1]})
-					if err := ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
+					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.Success, Message: "feeds found", Detail: u[len(u)-1]})
+					if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
@@ -79,8 +79,8 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 				}
 
 				if err == pgx.ErrNoRows {
-					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.EFEEDS_NO_FEEDS, Message: "feeds not found", Detail: model.Feed{Id: ff.Id}})
-					if err := ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
+					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsNoFeeds, Message: "feeds not found", Detail: model.Feed{ID: ff.ID}})
+					if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
@@ -93,8 +93,8 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 					continue
 				}
 
-				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.EFEEDS_DB_ERR, Message: "something happen in our end", Detail: model.Feed{Id: ff.Id}})
-				if err := ch.Publish(amqp.FEEDS_EXCHANGE, amqp.FEEDS_RES_RK, false, false, amqp091.Publishing{
+				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsDBError, Message: "something happen in our end", Detail: model.Feed{ID: ff.ID}})
+				if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",

@@ -10,7 +10,7 @@ import (
 )
 
 type GetFeedsRequest struct {
-	Id     uuid.UUID `query:"id"`
+	ID     uuid.UUID `query:"id"`
 	Offset int       `query:"offset"`
 	Type   string    `query:"type"` // M, J, A, S
 }
@@ -20,13 +20,13 @@ type GetFeedsResponse struct {
 	Detail []model.Feed `json:"detail"`
 }
 
-func (r GetFeedsResponse) Json() []byte {
+func (r GetFeedsResponse) JSON() []byte {
 	j, _ := json.Marshal(r)
 	return j
 }
 
 type HideRequest struct {
-	Id uuid.UUID `json:"id"`
+	ID uuid.UUID `json:"id"`
 }
 
 type HideResponse struct {
@@ -36,7 +36,7 @@ type HideResponse struct {
 
 type NewFeedRequest struct {
 	Title string `json:"title"`
-	Url   string `json:"url"`
+	URL   string `json:"url"`
 	Text  string `json:"text"`
 	Type  string `json:"type"`
 }
@@ -49,24 +49,24 @@ type NewFeedResponse struct {
 func (fr NewFeedRequest) ToFeed() model.Feed {
 	now := time.Now()
 	return model.Feed{
-		Id:         uuid.New(),
+		ID:         uuid.New(),
 		Title:      fr.Title,
-		Url:        fr.Url,
+		URL:        fr.URL,
 		Text:       fr.Text,
 		Type:       fr.Type,
 		Points:     0,
 		NCommnents: 0,
-		Created_At: &now,
+		CreatedAt:  &now,
 	}
 }
 
-func (fr NewFeedResponse) Json() []byte {
+func (fr NewFeedResponse) JSON() []byte {
 	j, _ := json.Marshal(fr)
 	return j
 }
 
 type DeleteRequest struct {
-	Id uuid.UUID `uri:"id"`
+	ID uuid.UUID `uri:"id"`
 }
 
 type DeleteResponse struct {

@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"time"
 
 	"github.com/booleanism/tetek/comments/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -32,12 +31,12 @@ func (cr commRouter) GetComments(ctx fiber.Ctx) error {
 
 	cto, cancel := context.WithTimeout(
 		c,
-		Timeout*time.Second)
+		Timeout)
 	defer cancel()
 
 	comms, err := cr.r.GetComments(cto, req)
 	if err == nil {
-		gRes.Code = errro.SUCCESS
+		gRes.Code = errro.Success
 		gRes.Message = "success fetching comments"
 		res := recipes.GetCommentsResponse{GenericResponse: gRes, Details: comms}
 		return ctx.Status(fiber.StatusOK).JSON(&res)

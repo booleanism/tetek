@@ -29,7 +29,7 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 		return nil, err
 	}
 
-	mgs, err := ch.Consume(amqp.AUTH_TASK_QUEUE, "", false, false, false, false, nil)
+	mgs, err := ch.Consume(amqp.AuthTaskQueue, "", false, false, false, false, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -43,8 +43,8 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 			task := amqp.AuthTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_PARSE_FAIL})
-				if err := ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
+				res, _ := json.Marshal(amqp.AuthResult{Code: errro.ErrAuthParseFail})
+				if err := ch.Publish(amqp.AuthExchange, amqp.AuthResRk, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
@@ -59,8 +59,8 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 
 			claim, err := c.jwt.Verify(task.Jwt)
 			if err != nil {
-				res, _ := json.Marshal(amqp.AuthResult{Code: errro.EAUTH_JWT_VERIFY_FAIL, AuthTask: task})
-				if err := ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
+				res, _ := json.Marshal(amqp.AuthResult{Code: errro.ErrAuthJWTVerifyFail, AuthTask: task})
+				if err := ch.Publish(amqp.AuthExchange, amqp.AuthResRk, false, false, amqp091.Publishing{
 					CorrelationId: d.CorrelationId,
 					Body:          res,
 					ContentType:   "text/json",
@@ -73,8 +73,8 @@ func (c *AuthContr) WorkerAuthListener() (*amqp091.Channel, error) {
 				continue
 			}
 
-			res, _ := json.Marshal(amqp.AuthResult{Code: errro.SUCCESS, AuthTask: task, Claims: *claim})
-			if err := ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_RES_RK, false, false, amqp091.Publishing{
+			res, _ := json.Marshal(amqp.AuthResult{Code: errro.Success, AuthTask: task, Claims: *claim})
+			if err := ch.Publish(amqp.AuthExchange, amqp.AuthResRk, false, false, amqp091.Publishing{
 				CorrelationId: d.CorrelationId,
 				Body:          res,
 				ContentType:   "text/json",

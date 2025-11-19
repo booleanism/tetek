@@ -32,7 +32,7 @@ type newCommentRequest struct {
 func (c newCommentRequest) toComment() model.Comment {
 	now := time.Now()
 	return model.Comment{
-		Id:        uuid.New(),
+		ID:        uuid.New(),
 		Parent:    c.Head,
 		Text:      c.Text,
 		By:        c.By,
@@ -47,7 +47,7 @@ type NewCommentResponse struct {
 	Detail model.Comment `json:"details"`
 }
 
-func (r NewCommentResponse) Json() []byte {
+func (r NewCommentResponse) JSON() []byte {
 	j, _ := json.Marshal(&r)
 	return j
 }

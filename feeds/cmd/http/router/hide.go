@@ -21,9 +21,9 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 
 	_, ok := ctx.Context().Value(keystore.AuthRes{}).(*amqp.AuthResult)
 	if !ok {
-		gRes.Code = errro.EAUTH_INVALID_AUTH_RESULT_TYPE
+		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "does not represent jwt type"
-		e := errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDETAIL_JSON)
+		e := errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDetailJSON)
 		return e.SendError(ctx, fiber.StatusBadRequest)
 	}
 
@@ -36,10 +36,10 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 	if err != nil {
 		gRes.Code = err.Code()
 		gRes.Message = err.Error()
-		return errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusInternalServerError)
+		return errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 
-	gRes.Code = errro.SUCCESS
+	gRes.Code = errro.Success
 	gRes.Message = "feed hidden"
 	res := recipes.HideResponse{GenericResponse: gRes, Detail: req}
 	return ctx.Status(fiber.StatusOK).JSON(&res)

@@ -21,11 +21,11 @@ func (r *profileRecipe) Profile(ctx context.Context, user model.User) (model.Use
 	u, err := r.repo.GetUser(ctx, user)
 	if err != nil {
 		if err == pgx.ErrNoRows {
-			e := errro.New(errro.EACCOUNT_NO_USER, "couldn't find user")
+			e := errro.New(errro.ErrAccountNoUser, "couldn't find user")
 			return model.User{}, e
 		}
 
-		e := errro.New(errro.EACCOUNT_DB_ERR, "something happen with database interaction")
+		e := errro.New(errro.ErrAccountDBError, "something happen with database interaction")
 		return model.User{}, e
 	}
 

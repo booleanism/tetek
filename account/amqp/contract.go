@@ -8,13 +8,13 @@ import (
 type User = model.User
 
 const (
-	ACCOUNT_EXCHANGE       = "x_account"
-	ACCOUNT_TASK_QUEUE     = "task_account"
-	ACCOUNT_TASK_RK        = "task.account.*"
-	ACCOUNT_RES_QUEUE      = "res_account"
-	ACCOUNT_RES_RK         = "res.account.*"
-	DLX_ACCOUNT_EXCHANGE   = "dlx_account"
-	DLQ_ACCOUNT_TASK_QUEUE = "dlq_task_account"
+	AccountExchange     = "x_account"
+	AccountTaskQueue    = "task_account"
+	AccountTaskRk       = "task.account.*"
+	AccountResQueue     = "res_account"
+	AccountResRk        = "res.account.*"
+	DlxAccountExchange  = "dlx_account"
+	DlqAccountTaskQueue = "dlq_task_account"
 )
 
 type AccountTask struct {
@@ -29,12 +29,12 @@ type AccountRes struct {
 }
 
 func AccountSetup(ch *amqp091.Channel) error {
-	err := ch.ExchangeDeclare(ACCOUNT_EXCHANGE, "topic", true, false, false, false, nil)
+	err := ch.ExchangeDeclare(AccountExchange, "topic", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.ExchangeDeclare(DLX_ACCOUNT_EXCHANGE, "fanout", true, false, false, false, nil)
+	err = ch.ExchangeDeclare(DlxAccountExchange, "fanout", true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -44,25 +44,25 @@ func AccountSetup(ch *amqp091.Channel) error {
 		return err
 	}
 
-	_, err = ch.QueueDeclare(DLQ_ACCOUNT_TASK_QUEUE, true, false, false, false, nil)
+	_, err = ch.QueueDeclare(DlqAccountTaskQueue, true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(DLQ_ACCOUNT_TASK_QUEUE, "", DLX_ACCOUNT_EXCHANGE, false, nil)
+	err = ch.QueueBind(DlqAccountTaskQueue, "", DlxAccountExchange, false, nil)
 	if err != nil {
 		return err
 	}
 
-	qTask, err := ch.QueueDeclare(ACCOUNT_TASK_QUEUE, true, false, false, false, amqp091.Table{
-		"x-dead-letter-exchange": DLX_ACCOUNT_EXCHANGE,
+	qTask, err := ch.QueueDeclare(AccountTaskQueue, true, false, false, false, amqp091.Table{
+		"x-dead-letter-exchange": DlxAccountExchange,
 		"x-message-ttl":          int32(5000),
 	})
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(qTask.Name, ACCOUNT_TASK_RK, ACCOUNT_EXCHANGE, false, nil)
+	err = ch.QueueBind(qTask.Name, AccountTaskRk, AccountExchange, false, nil)
 	if err != nil {
 		return err
 	}

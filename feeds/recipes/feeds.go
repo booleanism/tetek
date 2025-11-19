@@ -36,7 +36,7 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest) ([]model.
 	ff := repo.FeedsFilter{
 		Offset: uint64(req.Offset),
 		Type:   req.Type,
-		Id:     req.Id,
+		ID:     req.ID,
 	}
 
 	jwt, ok := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
@@ -53,18 +53,18 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest) ([]model.
 	if er != nil {
 		var pgErr *pgconn.PgError
 		if !errors.As(er, &pgErr) {
-			e := errro.FromError(errro.EFEEDS_DB_ERR, "error fetching feeds", er)
+			e := errro.FromError(errro.ErrFeedsDBError, "error fetching feeds", er)
 			return nil, e
 		}
 
 		if pgErr.Code == "23505" {
-			e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
+			e := errro.New(errro.ErrFeedsNoFeeds, "no feed(s) found")
 			return nil, e
 		}
 	}
 
 	if len(f) == 0 {
-		e := errro.New(errro.EFEEDS_NO_FEEDS, "no feed(s) found")
+		e := errro.New(errro.ErrFeedsNoFeeds, "no feed(s) found")
 		return nil, e
 	}
 
@@ -80,7 +80,7 @@ func (fr *feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error 
 
 	_, er := fr.repo.NewFeed(ctx, rFeed)
 	if er != nil {
-		e := errro.FromError(errro.EFEEDS_DB_ERR, "could not insert new feed", er)
+		e := errro.FromError(errro.ErrFeedsDBError, "could not insert new feed", er)
 		return e
 	}
 
@@ -89,11 +89,11 @@ func (fr *feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error 
 
 func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Error {
 	ff := repo.FeedsFilter{
-		Id: req.Id,
+		ID: req.ID,
 	}
 
-	if ff.Id.String() == "00000000-0000-0000-0000-000000000000" {
-		e := errro.New(errro.EFEEDS_MISSING_REQUIRED_FIELD, "missing required field")
+	if ff.ID.String() == "00000000-0000-0000-0000-000000000000" {
+		e := errro.New(errro.ErrFeedsMissingRequiredField, "missing required field")
 		return e
 	}
 
@@ -109,16 +109,16 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 	}
 
 	if er == pgx.ErrNoRows {
-		e := errro.New(errro.EFEEDS_NO_FEEDS, "failed to delete feed: no row")
+		e := errro.New(errro.ErrFeedsNoFeeds, "failed to delete feed: no row")
 		return e
 	}
 
-	if fDel.Deleted_At == nil {
-		e := errro.New(errro.EFEEDS_NO_FEEDS, "no such feed")
+	if fDel.DeletedAt == nil {
+		e := errro.New(errro.ErrFeedsNoFeeds, "no such feed")
 		return e
 	}
 
-	e := errro.New(errro.EFEEDS_DB_ERR, "somthing happen when trying to delete feed")
+	e := errro.New(errro.ErrFeedsDBError, "somthing happen when trying to delete feed")
 	return e
 }
 
@@ -127,14 +127,14 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 func (fr *feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
 	hf := repo.HiddenFeeds{
-		Id:     uuid.NewString(),
+		ID:     uuid.NewString(),
 		To:     jwt.Claims.Uname,
-		FeedId: req.Id,
+		FeedID: req.ID,
 	}
 
 	_, er := fr.repo.HideFeed(ctx, hf)
 	if er != nil {
-		e := errro.FromError(errro.EFEEDS_DB_ERR, "unable to hide feed", er)
+		e := errro.FromError(errro.ErrFeedsDBError, "unable to hide feed", er)
 		return e
 	}
 

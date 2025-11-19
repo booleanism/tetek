@@ -24,7 +24,7 @@ func NewAuth(con *amqp091.Connection) *LocalAuthContr {
 	return self
 }
 
-func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
+func (c *LocalAuthContr) Publish(corrID string, task amqp.AuthTask) error {
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -41,11 +41,11 @@ func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
 	}
 
 	c.mRes.Lock()
-	c.res[corrId] = make(chan *amqp.AuthResult, 1)
+	c.res[corrID] = make(chan *amqp.AuthResult, 1)
 	c.mRes.Unlock()
 
-	if err = ch.Publish(amqp.AUTH_EXCHANGE, amqp.AUTH_TASK_RK, false, false, amqp091.Publishing{
-		CorrelationId: corrId,
+	if err = ch.Publish(amqp.AuthExchange, amqp.AuthTaskRk, false, false, amqp091.Publishing{
+		CorrelationId: corrID,
 		Body:          t,
 		ContentType:   "text/json",
 	}); err != nil {
@@ -55,9 +55,9 @@ func (c *LocalAuthContr) Publish(corrId string, task amqp.AuthTask) error {
 	return nil
 }
 
-func (c *LocalAuthContr) Consume(corrId string) (*amqp.AuthResult, error) {
+func (c *LocalAuthContr) Consume(corrID string) (*amqp.AuthResult, error) {
 	c.mRes.Lock()
-	ch, ok := c.res[corrId]
+	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
 		return nil, errors.New("no result with given correlation id")
@@ -66,7 +66,7 @@ func (c *LocalAuthContr) Consume(corrId string) (*amqp.AuthResult, error) {
 	res := <-ch
 
 	c.mRes.Lock()
-	delete(c.res, corrId)
+	delete(c.res, corrID)
 	close(ch)
 	c.mRes.Unlock()
 
@@ -88,7 +88,7 @@ func (c *LocalAuthContr) authResListener() error {
 		return err
 	}
 
-	err = ch.QueueBind(q.Name, amqp.AUTH_RES_RK, amqp.AUTH_EXCHANGE, false, nil)
+	err = ch.QueueBind(q.Name, amqp.AuthResRk, amqp.AuthExchange, false, nil)
 	if err != nil {
 		return err
 	}

@@ -46,7 +46,7 @@ func (cr commRecipes) GetComments(ctx context.Context, req GetCommentsRequest) (
 	}
 
 	if n <= 0 && err == nil {
-		e := errro.New(errro.ECOMM_NO_COMM, "no such comments")
+		e := errro.New(errro.ErrCommNoConsume, "no such comments")
 		log.V(1).Info(e.Error())
 		return nil, e
 	}
@@ -55,7 +55,7 @@ func (cr commRecipes) GetComments(ctx context.Context, req GetCommentsRequest) (
 	// Handle known error here. we can utilizing errors.As
 	// Also check other recipes with same pattern
 
-	e := errro.FromError(errro.ECOMM_DB_ERR, "failed to fetch comments", err)
+	e := errro.FromError(errro.ErrCommDBError, "failed to fetch comments", err)
 	return nil, e
 }
 
@@ -67,17 +67,17 @@ func (cr commRecipes) NewComment(ctx context.Context, req NewCommentRequest) (mo
 	}).toComment()
 
 	// assume the head is feeds, then find it on feeds service
-	t := amqpFeeds.FeedsTask{Cmd: 0, Feeds: amqpFeeds.Feeds{Id: req.Head}}
-	feedsRes := &amqpFeeds.FeedsResult{Code: errro.EFEEDS_NO_FEEDS}
+	t := amqpFeeds.FeedsTask{Cmd: 0, Feeds: amqpFeeds.Feeds{ID: req.Head}}
+	feedsRes := &amqpFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
 	err := cr.feedsAdapter(ctx, t, &feedsRes)
 	if err != nil {
 		return model.Comment{}, err
 	}
 
-	com.Parent = feedsRes.Detail.Id
+	com.Parent = feedsRes.Detail.ID
 
 	// if no feeds, we took into comments database it self
-	if feedsRes.Code != errro.SUCCESS {
+	if feedsRes.Code != errro.Success {
 		var comBuf []model.Comment
 		cf := repo.CommentFilter{Head: req.Head}
 		if err := cr.getCommentsForNewComment(ctx, cf, &comBuf); err != nil {
@@ -86,7 +86,7 @@ func (cr commRecipes) NewComment(ctx context.Context, req NewCommentRequest) (mo
 
 		// getCommentsForNewComment may returns
 		// more than one comments, only last row of comments applied
-		com.Parent = comBuf[len(comBuf)-1].Id
+		com.Parent = comBuf[len(comBuf)-1].ID
 	}
 
 	if err := cr.actualNewComment(ctx, &com, feedsRes); err != nil {
@@ -99,7 +99,7 @@ func (cr commRecipes) getCommentsForNewComment(ctx context.Context, cf repo.Comm
 	ctx, log := loggr.GetLogger(ctx, "get-comment-for-new-comment")
 	n, err := cr.repo.GetComments(ctx, cf, comBuf)
 	if err != nil || n == 0 {
-		e := errro.New(errro.ECOMM_NO_COMM, "there is no such comments")
+		e := errro.New(errro.ErrCommNoConsume, "there is no such comments")
 		log.V(1).Info(e.Error(), "filter", cf)
 		return e
 	}
@@ -108,10 +108,10 @@ func (cr commRecipes) getCommentsForNewComment(ctx context.Context, cf repo.Comm
 
 func (cr commRecipes) actualNewComment(ctx context.Context, com *model.Comment, res *amqpFeeds.FeedsResult) errro.Error {
 	ctx, log := loggr.GetLogger(ctx, "actual-new-comment")
-	com.Parent = res.Detail.Id
+	com.Parent = res.Detail.ID
 	err := cr.repo.NewComment(ctx, &com)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to insert new comment", err)
+		e := errro.FromError(errro.ErrCommDBError, "failed to insert new comment", err)
 		log.Error(err, e.Error(), "comment", com)
 		return e
 	}
@@ -123,7 +123,7 @@ func buildCommentTree(tables []model.Comment, head uuid.UUID) []model.Comment {
 	tree := []model.Comment{}
 	for _, v := range tables {
 		if v.Parent.String() == head.String() {
-			v.Child = buildCommentTree(tables, v.Id)
+			v.Child = buildCommentTree(tables, v.ID)
 			tree = append(tree, v)
 		}
 	}

@@ -53,31 +53,31 @@ func OptionalAuth(auth contracts.AuthSubscribe) fiber.Handler {
 func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 	req := authRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
-		return "", errro.New(errro.INVALID_REQ, err.Error())
+		return "", errro.New(errro.ErrInvalidRequest, err.Error())
 	}
 
 	res := helper.GenericResponse{}
 	if req.Authorization == "" {
-		res.Code = errro.EAUTH_MISSING_HEADER
+		res.Code = errro.ErrAuthMissingHeader
 		res.Message = "missing authorization header"
 		e := errro.New(res.Code, res.Message)
-		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		return "", e.WithDetail(res.Json(), errro.TDetailJSON)
 	}
 
 	jwt, ok := strings.CutPrefix(req.Authorization, "Bearer ")
 	if !ok {
-		res.Code = errro.EAUTH_MISSMATCH_AUTH_MECHANISM
+		res.Code = errro.ErrAuthMissmatchScheme
 		res.Message = "mismatch authorization mechanism"
 		e := errro.New(res.Code, res.Message)
-		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		return "", e.WithDetail(res.Json(), errro.TDetailJSON)
 	}
 
 	r := regexp.MustCompile(`^(?:[\w-]*\.){2}[\w-]*$`)
 	if !r.Match([]byte(jwt)) {
-		res.Code = errro.EAUTH_JWT_MALFORMAT
+		res.Code = errro.ErrAuthJWTMalformat
 		res.Message = "jwt malformat"
 		e := errro.New(res.Code, res.Message)
-		return "", e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		return "", e.WithDetail(res.Json(), errro.TDetailJSON)
 	}
 
 	return jwt, nil
@@ -90,7 +90,7 @@ func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 		if er != nil {
 			res.Code = er.Code()
 			res.Message = er.Error()
-			return er.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusBadRequest)
+			return er.WithDetail(res.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
@@ -102,17 +102,17 @@ func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 
 		var authRes *amqp.AuthResult
 		if err := actualAuth(cto, auth, &authRes); err != nil {
-			if err.Code() == errro.EAUTH_SERVICE_UNAVAILABLE {
+			if err.Code() == errro.ErrServiceUnavailable {
 				return err.SendError(ctx, fiber.StatusRequestTimeout)
 			}
 			return err.SendError(ctx, fiber.StatusUnauthorized)
 		}
 
 		if authRes == nil {
-			res.Code = errro.EAUTH_JWT_VERIFY_FAIL
+			res.Code = errro.ErrAuthJWTVerifyFail
 			res.Message = "authorization failed"
 			e := errro.New(res.Code, res.Message)
-			return e.WithDetail(res.Json(), errro.TDETAIL_JSON).SendError(ctx, fiber.StatusUnauthorized)
+			return e.WithDetail(res.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
 		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))
@@ -124,38 +124,38 @@ func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amq
 	authTask, ok := ctx.Value(keystore.AuthTask{}).(*amqp.AuthTask)
 	res := helper.GenericResponse{}
 	if !ok {
-		res.Code = errro.EAUTH_EMPTY_JWT
+		res.Code = errro.ErrAuthEmptyJWT
 		res.Message = "did not receive jwt"
 		e := errro.New(res.Code, res.Message)
-		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		return e.WithDetail(res.Json(), errro.TDetailJSON)
 	}
 
 	if err := authAdapter(ctx, auth, *authTask, authRes); err != nil {
-		res.Code = errro.EAUTH_SERVICE_UNAVAILABLE
+		res.Code = errro.ErrServiceUnavailable
 		res.Message = "auth service unavailable: publishing auth task"
 		e := errro.New(res.Code, res.Message)
-		return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+		return e.WithDetail(res.Json(), errro.TDetailJSON)
 	}
 
-	if (*authRes).Code == errro.SUCCESS {
+	if (*authRes).Code == errro.Success {
 		return nil
 	}
 
-	res.Code = errro.EAUTH_JWT_VERIFY_FAIL
+	res.Code = errro.ErrAuthJWTVerifyFail
 	res.Message = "authorization failed"
 	e := errro.New(res.Code, res.Message)
-	return e.WithDetail(res.Json(), errro.TDETAIL_JSON)
+	return e.WithDetail(res.Json(), errro.TDetailJSON)
 }
 
 func authAdapter(ctx context.Context, auth contracts.AuthSubscribe, t amqp.AuthTask, res **amqp.AuthResult) errro.Error {
 	if err := auth.Publish(ctx, t); err != nil {
-		e := errro.FromError(errro.ECOMM_PUB_FAIL, "failed to publish auth task", err)
+		e := errro.FromError(errro.ErrCommPubFail, "failed to publish auth task", err)
 		return e
 	}
 
 	err := auth.Consume(ctx, res)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_CONSUME_FAIL, "failed to consume auth result", err)
+		e := errro.FromError(errro.ErrCommConsumeFail, "failed to consume auth result", err)
 		return e
 	}
 	return nil

@@ -8,19 +8,19 @@ import (
 	"github.com/google/uuid"
 )
 
-func (r commRepo) Upvote(ctx context.Context, cf CommentFilter) error {
+func (c commRepo) Upvote(ctx context.Context, cf CommentFilter) error {
 	ctx, log := loggr.GetLogger(ctx, "repo/upvote")
-	d, err := r.Acquire(ctx)
+	d, err := c.Acquire(ctx)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to acquire db pool", err)
+		e := errro.FromError(errro.ErrCommDBError, "failed to acquire db pool", err)
 		log.Error(e, e.Error())
 		return e
 	}
 
 	sql := "INSERT INTO points (id, by, comments_id) VALUES ($1, $2, $3) ON CONFLICT (by, comments_id) DO NOTHING;"
-	_, err = d.Exec(ctx, sql, uuid.New(), cf.By, cf.Id)
+	_, err = d.Exec(ctx, sql, uuid.New(), cf.By, cf.ID)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_UPVOTE_FAIL, "failed to upvote comments", err)
+		e := errro.FromError(errro.ErrCommUpvoteFail, "failed to upvote comments", err)
 		log.Error(err, e.Error(), "filter", cf)
 		return e
 	}
@@ -28,19 +28,19 @@ func (r commRepo) Upvote(ctx context.Context, cf CommentFilter) error {
 	return nil
 }
 
-func (r commRepo) Downvote(ctx context.Context, cf CommentFilter) error {
+func (c commRepo) Downvote(ctx context.Context, cf CommentFilter) error {
 	ctx, log := loggr.GetLogger(ctx, "repo/downvote")
-	d, err := r.Acquire(ctx)
+	d, err := c.Acquire(ctx)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_DB_ERR, "failed to acquire db pool", err)
+		e := errro.FromError(errro.ErrCommDBError, "failed to acquire db pool", err)
 		log.Error(e, e.Error())
 		return e
 	}
 
 	sql := "DELETE FROM points WHERE by = $1 AND comments_id = $2;"
-	_, err = d.Exec(ctx, sql, cf.By, cf.Id)
+	_, err = d.Exec(ctx, sql, cf.By, cf.ID)
 	if err != nil {
-		e := errro.FromError(errro.ECOMM_DOWNVOTE_FAIL, "failed to downvote comments", err)
+		e := errro.FromError(errro.ErrCommDownvoteFail, "failed to downvote comments", err)
 		log.Error(err, e.Error(), "filter", cf)
 		return e
 	}

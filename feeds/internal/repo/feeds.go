@@ -14,7 +14,7 @@ import (
 type FeedsFilter struct {
 	Type     string    `json:"type"`
 	Order    int       `json:"order"` // 0: by points, 1: newest, 2: oldest
-	Id       uuid.UUID `json:"id"`
+	ID       uuid.UUID `json:"id"`
 	Offset   uint64    `json:"offset"`
 	By       string    `json:"by"`
 	HiddenTo string    `json:"hidden_to"`
@@ -55,8 +55,8 @@ func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter) ([]model.Feed, er
 		pred["hf.id"] = nil
 	}
 
-	if ff.Id.String() != "00000000-0000-0000-0000-000000000000" {
-		pred["f.id"] = ff.Id
+	if ff.ID.String() != "00000000-0000-0000-0000-000000000000" {
+		pred["f.id"] = ff.ID
 	}
 
 	base = base.Where(pred)
@@ -98,7 +98,7 @@ func scanRows(rws pgx.Rows) ([]model.Feed, error) {
 	n := 0
 	for rws.Next() {
 		f := model.Feed{}
-		if err := rws.Scan(&f.Id, &f.Title, &f.Url, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.Created_At); err != nil {
+		if err := rws.Scan(&f.ID, &f.Title, &f.URL, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.CreatedAt); err != nil {
 			return nil, err
 		}
 		feeds = append(feeds, f)
@@ -121,8 +121,8 @@ func (r *feedsRepo) NewFeed(ctx context.Context, feed model.Feed) (model.Feed, e
 
 	f := model.Feed{}
 	err = q.QueryRow(ctx, "INSERT INTO feeds (id, title, url, text, by, type, points, n_comments, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
-		feed.Id, feed.Title, feed.Url, feed.Text, feed.By, feed.Type, feed.Points, feed.NCommnents, feed.Created_At,
-	).Scan(&f.Id, &f.Title, &f.Url, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.Created_At, &f.Deleted_At)
+		feed.ID, feed.Title, feed.URL, feed.Text, feed.By, feed.Type, feed.Points, feed.NCommnents, feed.CreatedAt,
+	).Scan(&f.ID, &f.Title, &f.URL, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.CreatedAt, &f.DeletedAt)
 
 	return f, err
 }
@@ -136,7 +136,7 @@ func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter) (model.Feed,
 
 	base := r.sq.Update("feeds").Set("deleted_at", time.Now())
 
-	where := squirrel.Eq{"id": ff.Id}
+	where := squirrel.Eq{"id": ff.ID}
 	if ff.By != "" {
 		where["by"] = ff.By
 	}
@@ -151,7 +151,7 @@ func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter) (model.Feed,
 	f := model.Feed{}
 	err = q.QueryRow(
 		ctx, sql, args...,
-	).Scan(&f.Deleted_At)
+	).Scan(&f.DeletedAt)
 
 	return f, err
 }

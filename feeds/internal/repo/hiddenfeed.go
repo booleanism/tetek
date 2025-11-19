@@ -7,9 +7,9 @@ import (
 )
 
 type HiddenFeeds struct {
-	Id     string    `json:"id"`
+	ID     string    `json:"id"`
 	To     string    `json:"to"`
-	FeedId uuid.UUID `json:"feed_id"`
+	FeedID uuid.UUID `json:"feed_id"`
 }
 
 func (r *feedsRepo) HideFeed(ctx context.Context, hf HiddenFeeds) (HiddenFeeds, error) {
@@ -23,8 +23,8 @@ func (r *feedsRepo) HideFeed(ctx context.Context, hf HiddenFeeds) (HiddenFeeds, 
 	err = q.QueryRow(
 		ctx,
 		"INSERT INTO hiddenfeeds (id, to_uname, feed) VALUES ($1, $2, $3) ON CONFLICT (to_uname, feed) DO UPDATE SET feed = EXCLUDED.feed RETURNING id, to_uname, feed",
-		hf.Id, hf.To, hf.FeedId,
-	).Scan(&f.Id, &f.To, &f.FeedId)
+		hf.ID, hf.To, hf.FeedID,
+	).Scan(&f.ID, &f.To, &f.FeedID)
 
 	return f, err
 }

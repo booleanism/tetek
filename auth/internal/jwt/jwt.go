@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	// "github.com/booleanism/tetek/account/contract"
 	"github.com/booleanism/tetek/account/amqp"
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -14,8 +13,8 @@ type JwtRecipes interface {
 	Generate(amqp.User) (string, error)
 }
 
-// in hours
-const EXP_JWT = 24
+// ExpJwt expired token in hours
+const ExpJwt = 24 * time.Hour
 
 type JwtClaims struct {
 	Uname string `json:"uname"`
@@ -61,7 +60,7 @@ func (r *jwtRecipe) Generate(user amqp.User) (string, error) {
 		Role:  string(user.Role),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   "auth",
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(EXP_JWT * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ExpJwt)),
 		},
 	})
 

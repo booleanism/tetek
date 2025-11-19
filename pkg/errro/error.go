@@ -20,61 +20,59 @@ type ResError interface {
 }
 
 const (
-	EACCOUNT_CANT_LOGIN           = -8
-	EACCOUNT_PASSWD_HASH_FAIL     = -6
-	EACCOUNT_SERVICE_UNAVAILABLE  = -4
-	EACCOUNT_DB_ERR               = -2
-	EACCOUNT_PARSE_FAIL           = -1
-	EACCOUNT_NO_USER              = 1
-	EACCOUNT_EMPTY_PARAM          = 2
-	EACCOUNT_USER_ALREADY_EXIST   = 7
-	EACCOUNT_REGIST_FAIL          = 8
-	EACCOUNT_INVALID_REGIST_PARAM = EAUTH_INVALID_LOGIN_PARAM
+	ErrAccountCantLogin          = -8
+	ErrAccountPasswdHashFail     = -6
+	ErrAccountServiceUnavailable = -4
+	ErrAccountDBError            = -2
+	ErrAccountParseFail          = -1
+	ErrAccountNoUser             = 1
+	ErrAccountEmptyParam         = 2
+	ErrAccountUserAlreadyExist   = 7
+	ErrAccountRegistFail         = 8
+	ErrAccountInvalidRegistParam = ErrAuthInvalidLoginParam
 )
 
 const (
-	SUCCESS       = 0
-	INVALID_REQ   = EACCOUNT_PARSE_FAIL
-	YOUR_BAD      = 16
-	MY_BAD        = 17
-	LOGGING_ERROR = -9
-	TIMEOUT       = -13
+	Success           = 0
+	ErrInvalidRequest = ErrAccountParseFail
+	ErrLogging        = -9
+	ErrTimeout        = -13
 )
 
 const (
-	EAUTH_JWT_GENERATAION_FAIL     = -7
-	EAUTH_RETRIEVE_USER_FAIL       = -5
-	EAUTH_SERVICE_UNAVAILABLE      = -3
-	EAUTH_PARSE_FAIL               = EACCOUNT_PARSE_FAIL
-	EAUTH_JWT_VERIFY_FAIL          = 4
-	EAUTH_EMPTY_JWT                = 19
-	EAUTH_MISSMATCH_AUTH_MECHANISM = 5
-	EAUTH_INVALID_LOGIN_PARAM      = 6
-	EAUTH_INVALID_CREDS            = 9
-	EAUTH_MISSING_HEADER           = 10
-	EAUTH_INVALID_AUTH_RESULT_TYPE = 12
-	EAUTH_JWT_MALFORMAT            = 19
+	ErrAuthJWTGenerationFail = -7
+	ErrAuthFailRetrieveUser  = -5
+	ErrServiceUnavailable    = ErrAccountServiceUnavailable
+	ErrAuthParseFail         = ErrAccountParseFail
+	ErrAuthJWTVerifyFail     = 4
+	ErrAuthEmptyJWT          = 19
+	ErrAuthMissmatchScheme   = 5
+	ErrAuthInvalidLoginParam = 6
+	ErrAuthInvalidCreds      = 9
+	ErrAuthMissingHeader     = 10
+	ErrAuthInvalidType       = 12
+	ErrAuthJWTMalformat      = 19
 )
 
 const (
-	EFEEDS_MISSING_REQUIRED_FIELD = 11
-	EFEEDS_DB_ERR                 = EACCOUNT_DB_ERR
-	EFEEDS_NEW_FAIL               = 13
-	EFEEDS_NO_FEEDS               = EACCOUNT_NO_USER
-	EFEEDS_DELETE_FAIL            = 15
-	EFEEDS_PARSE_FAIL             = EACCOUNT_PARSE_FAIL
+	ErrFeedsMissingRequiredField = 11
+	ErrFeedsDBError              = ErrAccountDBError
+	ErrFeedsNewFail              = 13
+	ErrFeedsNoFeeds              = ErrAccountNoUser
+	ErrFeedsDeleteFail           = 15
+	ErrFeedsParseFail            = ErrAccountParseFail
 )
 
 const (
-	ECOMM_DB_ERR          = EFEEDS_DB_ERR
-	ECOMM_QUERY_ERR       = -14
-	ECOMM_SCAN_ERR        = -15
-	ECOMM_FAIL_BUILD_TREE = -10
-	ECOMM_PUB_FAIL        = -11
-	ECOMM_CONSUME_FAIL    = -12
-	ECOMM_NO_COMM         = EACCOUNT_NO_USER
-	ECOMM_DOWNVOTE_FAIL   = -16
-	ECOMM_UPVOTE_FAIL     = -17
+	ErrCommDBError       = ErrFeedsDBError
+	ErrCommQueryError    = -14
+	ErrCommScanError     = -15
+	ErrCommBuildTreeFail = -10
+	ErrCommPubFail       = -11
+	ErrCommConsumeFail   = -12
+	ErrCommNoConsume     = ErrAccountNoUser
+	ErrCommDownvoteFail  = -16
+	ErrCommUpvoteFail    = -17
 )
 
 type err struct {
@@ -86,8 +84,8 @@ type err struct {
 }
 
 const (
-	TDETAIL_RAW = iota
-	TDETAIL_JSON
+	TDetailRaw = iota
+	TDetailJSON
 )
 
 func New(code int, msg string) *err {
@@ -120,9 +118,9 @@ type Jsonable interface {
 	Json() []byte
 }
 
-func (e *err) WithJson(res Jsonable) *resErr {
+func (e *err) WithJSON(res Jsonable) *resErr {
 	e.detail = res.Json()
-	e.t = TDETAIL_JSON
+	e.t = TDetailJSON
 	return &resErr{e}
 }
 
@@ -143,7 +141,7 @@ func (e *resErr) SendError(ctx fiber.Ctx, status int) error {
 		return ctx.Status(status).Send([]byte(e.m))
 	}
 
-	if e.t == TDETAIL_JSON {
+	if e.t == TDetailJSON {
 		ctx.Set("Content-Type", "application/json")
 		return ctx.Status(status).Send(e.detail)
 	}
