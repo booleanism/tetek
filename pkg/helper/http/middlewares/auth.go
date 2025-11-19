@@ -61,7 +61,7 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 		res.Code = errro.ErrAuthMissingHeader
 		res.Message = "missing authorization header"
 		e := errro.New(res.Code, res.Message)
-		return "", e.WithDetail(res.Json(), errro.TDetailJSON)
+		return "", e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
 	jwt, ok := strings.CutPrefix(req.Authorization, "Bearer ")
@@ -69,7 +69,7 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 		res.Code = errro.ErrAuthMissmatchScheme
 		res.Message = "mismatch authorization mechanism"
 		e := errro.New(res.Code, res.Message)
-		return "", e.WithDetail(res.Json(), errro.TDetailJSON)
+		return "", e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
 	r := regexp.MustCompile(`^(?:[\w-]*\.){2}[\w-]*$`)
@@ -77,7 +77,7 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 		res.Code = errro.ErrAuthJWTMalformat
 		res.Message = "jwt malformat"
 		e := errro.New(res.Code, res.Message)
-		return "", e.WithDetail(res.Json(), errro.TDetailJSON)
+		return "", e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
 	return jwt, nil
@@ -90,7 +90,7 @@ func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 		if er != nil {
 			res.Code = er.Code()
 			res.Message = er.Error()
-			return er.WithDetail(res.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
+			return er.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
@@ -112,7 +112,7 @@ func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 			res.Code = errro.ErrAuthJWTVerifyFail
 			res.Message = "authorization failed"
 			e := errro.New(res.Code, res.Message)
-			return e.WithDetail(res.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusUnauthorized)
+			return e.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
 		ctx.SetContext(context.WithValue(c, keystore.AuthRes{}, authRes))
@@ -127,14 +127,14 @@ func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amq
 		res.Code = errro.ErrAuthEmptyJWT
 		res.Message = "did not receive jwt"
 		e := errro.New(res.Code, res.Message)
-		return e.WithDetail(res.Json(), errro.TDetailJSON)
+		return e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
 	if err := authAdapter(ctx, auth, *authTask, authRes); err != nil {
 		res.Code = errro.ErrServiceUnavailable
 		res.Message = "auth service unavailable: publishing auth task"
 		e := errro.New(res.Code, res.Message)
-		return e.WithDetail(res.Json(), errro.TDetailJSON)
+		return e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
 	if (*authRes).Code == errro.Success {
@@ -144,7 +144,7 @@ func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amq
 	res.Code = errro.ErrAuthJWTVerifyFail
 	res.Message = "authorization failed"
 	e := errro.New(res.Code, res.Message)
-	return e.WithDetail(res.Json(), errro.TDetailJSON)
+	return e.WithDetail(res.JSON(), errro.TDetailJSON)
 }
 
 func authAdapter(ctx context.Context, auth contracts.AuthSubscribe, t amqp.AuthTask, res **amqp.AuthResult) errro.Error {

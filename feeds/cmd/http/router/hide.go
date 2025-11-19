@@ -23,7 +23,7 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 	if !ok {
 		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "does not represent jwt type"
-		e := errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDetailJSON)
+		e := errro.New(gRes.Code, gRes.Message).WithDetail(gRes.JSON(), errro.TDetailJSON)
 		return e.SendError(ctx, fiber.StatusBadRequest)
 	}
 
@@ -36,7 +36,7 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 	if err != nil {
 		gRes.Code = err.Code()
 		gRes.Message = err.Error()
-		return errro.New(gRes.Code, gRes.Message).WithDetail(gRes.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
+		return errro.New(gRes.Code, gRes.Message).WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 
 	gRes.Code = errro.Success

@@ -51,5 +51,5 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 
 	gRes.Code = errro.ErrFeedsDBError
 	gRes.Message = "fail to fetch feeds"
-	return err.WithDetail(gRes.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
+	return err.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 }

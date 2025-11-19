@@ -37,7 +37,7 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 				Message: "uname empty",
 			}
 			e := errro.New(res.Code, res.Message)
-			return e.WithDetail(res.Json(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
+			return e.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
 		u, err := rec.Profile(ctx.Context(), model.User{Uname: req.Uname})

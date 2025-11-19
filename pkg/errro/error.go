@@ -114,12 +114,12 @@ func (e *err) WithDetail(detail []byte, detailType int) *resErr {
 	return &resErr{e}
 }
 
-type Jsonable interface {
-	Json() []byte
+type JSONable interface {
+	JSON() []byte
 }
 
-func (e *err) WithJSON(res Jsonable) *resErr {
-	e.detail = res.Json()
+func (e *err) WithJSON(res JSONable) *resErr {
+	e.detail = res.JSON()
 	e.t = TDetailJSON
 	return &resErr{e}
 }

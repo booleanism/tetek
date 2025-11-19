@@ -23,7 +23,7 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 	if !ok {
 		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "missing jwt"
-		e := errro.New(gRes.Code, "does not represent jwt type").WithDetail(gRes.Json(), errro.TDetailJSON)
+		e := errro.New(gRes.Code, "does not represent jwt type").WithDetail(gRes.JSON(), errro.TDetailJSON)
 		return e.SendError(ctx, fiber.StatusUnauthorized)
 	}
 

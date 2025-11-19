@@ -1,13 +1,10 @@
 package helper
 
 import (
-	"context"
 	"encoding/json"
 
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/gofiber/fiber/v3"
-	"github.com/google/uuid"
 )
 
 type GenericResponse struct {
@@ -15,7 +12,7 @@ type GenericResponse struct {
 	Message string `json:"message"`
 }
 
-func (r GenericResponse) Json() []byte {
+func (r GenericResponse) JSON() []byte {
 	j, _ := json.Marshal(r)
 	return j
 }
@@ -27,12 +24,7 @@ func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
 			Code:    errro.ErrInvalidRequest,
 			Message: "malformat request, failed to bind the request",
 		}
-		return errro.New(errro.ErrInvalidRequest, "malformat request, failed to bind the request").WithDetail(r.Json(), errro.TDetailJSON)
+		return errro.New(errro.ErrInvalidRequest, "malformat request, failed to bind the request").WithDetail(r.JSON(), errro.TDetailJSON)
 	}
 	return nil
-}
-
-func GenerateRequestId(ctx fiber.Ctx) error {
-	ctx.SetContext(context.WithValue(ctx.Context(), keystore.RequestId{}, uuid.NewString()))
-	return ctx.Next()
 }
