@@ -43,7 +43,7 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
-		jwt, err := logRec.Login(req.toUser())
+		jwt, err := logRec.Login(ctx.Context(), req.toUser())
 		if err == nil {
 			res := loginResponse{
 				Code:    errro.Success,

@@ -8,11 +8,22 @@ import (
 	"github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/auth/recipes"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
+	"github.com/go-logr/zerologr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog"
+)
+
+const (
+	ServiceName = "auth"
+	LogV        = 4
 )
 
 func main() {
+	zl := zerolog.New(os.Stderr)
+	zerologr.SetMaxV(LogV)
+
 	mqStr := os.Getenv("BROKER_STR")
 	if mqStr == "" {
 		panic("amqp connection string empty")
@@ -51,6 +62,8 @@ func main() {
 	app := fiber.New()
 	api := app.Group("/api/v0")
 	{
+		api.Use(middlewares.GenerateRequestID)
+		api.Use(middlewares.Logger(ServiceName, &zl))
 		api.Post("/", router.Login(logRec))
 	}
 

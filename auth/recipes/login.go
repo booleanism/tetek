@@ -1,34 +1,34 @@
 package recipes
 
 import (
+	"context"
+
 	"github.com/booleanism/tetek/account/amqp"
-	"github.com/booleanism/tetek/auth/internal/contract"
 	"github.com/booleanism/tetek/auth/internal/jwt"
+	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type LoginRecipe interface {
-	Login(amqp.User) (string, errro.Error)
+	Login(context.Context, amqp.User) (string, errro.Error)
 }
 
 type loginRecipe struct {
-	l   *contract.LocalAccContr
+	l   contracts.AccountSubscribe
 	jwt jwt.JwtRecipes
 }
 
-func NewLogin(contr *contract.LocalAccContr, jwt jwt.JwtRecipes) *loginRecipe {
+func NewLogin(contr contracts.AccountSubscribe, jwt jwt.JwtRecipes) *loginRecipe {
 	return &loginRecipe{contr, jwt}
 }
 
-func (r *loginRecipe) Login(user amqp.User) (string, errro.Error) {
+func (r *loginRecipe) Login(ctx context.Context, user amqp.User) (string, errro.Error) {
 	if (user.Uname == "" && user.Email == "") || user.Passwd == "" {
 		e := errro.New(errro.ErrAuthInvalidLoginParam, "either email or uname and passwd should non empty value")
 		return "", e
 	}
 
-	id := uuid.NewString()
 	task := amqp.AccountTask{
 		Cmd: 0,
 		User: amqp.User{
@@ -38,12 +38,13 @@ func (r *loginRecipe) Login(user amqp.User) (string, errro.Error) {
 		},
 	}
 
-	if err := r.l.Publish(id, task); err != nil {
+	if err := r.l.Publish(ctx, task); err != nil {
 		e := errro.New(errro.ErrAccountServiceUnavailable, "failed to publish account task")
 		return "", e
 	}
 
-	res, err := r.l.Consume(id)
+	var res *amqp.AccountRes
+	err := r.l.Consume(ctx, &res)
 	if err != nil {
 		e := errro.New(errro.ErrAccountServiceUnavailable, "failed consuming account result")
 		return "", e
