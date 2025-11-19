@@ -8,7 +8,6 @@ import (
 	"github.com/booleanism/tetek/comments/recipes"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/pkg/contracts"
-	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/go-logr/zerologr"
 	"github.com/gofiber/fiber/v3"
@@ -54,7 +53,7 @@ func main() {
 	app := fiber.New()
 	apiEp := app.Group("/api/v0")
 
-	apiEp.Use(helper.GenerateRequestId)
+	apiEp.Use(middlewares.GenerateRequestID)
 	apiEp.Use(middlewares.Logger("comments-service", &zl))
 
 	apiEp.Get("/:id", middlewares.OptionalAuth(authContr), router.GetComments).Name("get-comments")
