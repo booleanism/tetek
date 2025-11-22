@@ -10,15 +10,16 @@ import (
 )
 
 type ProfileRecipes interface {
-	Profile(context.Context, model.User) (model.User, errro.Error)
+	Profile(context.Context, ProfileRequest) (model.User, errro.Error)
 }
 
 type profileRecipe struct {
 	repo repo.UserRepo
 }
 
-func (r profileRecipe) Profile(ctx context.Context, user model.User) (model.User, errro.Error) {
-	u, err := r.repo.GetUser(ctx, user)
+func (r profileRecipe) Profile(ctx context.Context, req ProfileRequest) (model.User, errro.Error) {
+	u := &model.User{Uname: req.Uname}
+	err := r.repo.GetUser(ctx, &u)
 	if err == nil {
 		return model.User{
 			Uname:     u.Uname,

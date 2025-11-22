@@ -10,13 +10,13 @@ import (
 
 func Logger(name string, zl *zerolog.Logger) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		reqID, ok := ctx.Context().Value(keystore.RequestId{}).(string)
+		reqID, ok := ctx.Context().Value(keystore.RequestID{}).(string)
 		if !ok {
 			reqID = "<invalid requestId>"
 		}
 
-		log := loggr.NewLogger("comments-service", zl)
-		log = log.WithValues("requestId", reqID).V(1)
+		log := loggr.NewLogger(name, zl)
+		log = log.WithValues("requestID", reqID).V(1)
 		c := logr.NewContext(ctx.Context(), log)
 		ctx.SetContext(c)
 

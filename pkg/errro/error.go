@@ -6,16 +6,30 @@ import (
 	"github.com/gofiber/fiber/v3"
 )
 
+type ErrMsg interface {
+	Msg() string
+}
+
+type ErrCode interface {
+	Code() int
+}
+
+type JSONable interface {
+	JSON() []byte
+}
+
 type Error interface {
 	error
-	Code() int
-	// TODO: use interface returning []byte for the detail
+	ErrMsg
+	ErrCode
 	WithDetail(detail []byte, detailType int) *resErr
+	WithJSON(res JSONable) *resErr
 }
 
 type ResError interface {
 	error
-	Code() int
+	ErrMsg
+	ErrCode
 	SendError(fiber.Ctx, int) error
 }
 
@@ -96,6 +110,10 @@ func FromError(code int, msg string, e error) *err {
 	return &err{code, msg, e, nil, 0}
 }
 
+func (e err) Msg() string {
+	return e.m
+}
+
 func (e *err) Error() string {
 	if e.e != nil && e.m != e.e.Error() {
 		return fmt.Sprintf("%s: %s", e.m, e.e.Error())
@@ -114,10 +132,6 @@ func (e *err) WithDetail(detail []byte, detailType int) *resErr {
 	return &resErr{e}
 }
 
-type JSONable interface {
-	JSON() []byte
-}
-
 func (e *err) WithJSON(res JSONable) *resErr {
 	e.detail = res.JSON()
 	e.t = TDetailJSON
@@ -134,6 +148,10 @@ func (e *resErr) Error() string {
 	}
 
 	return e.m
+}
+
+func (e *resErr) Msg() string {
+	return e.err.Msg()
 }
 
 func (e *resErr) SendError(ctx fiber.Ctx, status int) error {

@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	"github.com/booleanism/tetek/account/amqp"
+	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -23,28 +25,22 @@ type localAccContr struct {
 	mRes sync.Mutex
 }
 
-func SubscribeAccount(con *amqp091.Connection, subcriberName string) *localAccContr {
-	self := &localAccContr{con: con, res: make(map[string]chan *amqp.AccountRes)}
-	if err := self.accountResListener(subcriberName); err != nil {
-		panic(err)
-	}
-
-	return self
+func SubscribeAccount(con *amqp091.Connection) *localAccContr {
+	return &localAccContr{con: con, res: make(map[string]chan *amqp.AccountRes)}
 }
 
 func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) error {
-	corrID, ok := ctx.Value(keystore.RequestId{}).(string)
-	if !ok {
-		return errors.New("no requestId")
-	}
+	corrID := ctx.Value(keystore.RequestID{}).(string)
+	_, log := loggr.GetLogger(ctx, "account-task-publisher")
 
 	ch, err := c.con.Channel()
 	if err != nil {
+		log.Error(err, "failed to open channel")
 		return err
 	}
 	defer func() {
 		if err := ch.Close(); err != nil {
-			panic(err)
+			log.Error(err, "failed to close channel")
 		}
 	}()
 
@@ -52,16 +48,13 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 	c.res[corrID] = make(chan *amqp.AccountRes)
 	c.mRes.Unlock()
 
-	t, err := json.Marshal(&task)
-	if err != nil {
-		return err
-	}
-
+	t, _ := json.Marshal(&task)
 	if err = ch.Publish(amqp.AccountExchange, amqp.AccountTaskRk, false, false, amqp091.Publishing{
 		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
 	}); err != nil {
+		log.Error(err, "failed to publish account task", "task", task)
 		return err
 	}
 
@@ -69,17 +62,23 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 }
 
 func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountRes) error {
-	corrID := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestID{}).(string)
+	_, log := loggr.GetLogger(ctx, "account-task-publisher")
+
 	c.mRes.Lock()
 	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
-		return errors.New("no result with given correlation id")
+		e := errors.New("no account result with given correlation id")
+		log.V(1).Info("does not receive account result from chan", "error", e)
+		return e
 	}
 
 	select {
 	case <-ctx.Done():
-		return errors.New("failed to consume account task")
+		e := errors.New("deadline exceeded")
+		log.V(1).Info("receive ctx.Done", "error", e)
+		return e
 	case *res = <-ch:
 		c.mRes.Lock()
 		delete(c.res, corrID)
@@ -90,7 +89,8 @@ func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountRes) erro
 	}
 }
 
-func (c *localAccContr) accountResListener(name string) error {
+func (c *localAccContr) AccountResListener(ctx context.Context, name string) error {
+	_, log := loggr.GetLogger(ctx, "account-res-listener")
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -117,38 +117,37 @@ func (c *localAccContr) accountResListener(name string) error {
 
 	go func() {
 		for d := range mgs {
+			if d.ContentType != "text/json" {
+				log.V(1).Info("unexpected ContentType", "requestID", d.CorrelationId, "ContentType", d.ContentType)
+				helper.Nack(log, d, "unexpected ContentType")
+				continue
+			}
+
 			c.mRes.Lock()
 			respCh, ok := c.res[d.CorrelationId]
 			c.mRes.Unlock()
-
 			if !ok {
-				if err := d.Nack(false, false); err != nil {
-					continue
-				}
+				helper.Nack(log, d, "requestID", d.CorrelationId, "res", c.res)
 				continue
 			}
 
-			if d.ContentType != "text/json" {
-				continue
-			}
-
-			var res amqp.AccountRes
+			res := amqp.AccountRes{}
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				if err := d.Nack(false, false); err != nil {
-					continue
-				}
+				log.V(1).Info("failed to marshal account result", "requestID", d.CorrelationId, "body", d.Body)
+				helper.Nack(log, d, "failed to marshal account result", "requestID", d.CorrelationId, "body", d.Body)
 				continue
 			}
 
 			select {
 			case respCh <- &res:
 				if err := d.Ack(false); err != nil {
+					log.Error(err, "failed to nack account result", "requestID", d.CorrelationId, "message", d)
 					continue
 				}
 			default:
-				if err := d.Nack(false, false); err != nil {
-					continue
-				}
+				helper.Nack(log, d, "cannot sent auth result into result chan", "requestID", d.CorrelationId, "result", res)
+				log.V(1).Info("cannot sent auth result into result chan", "requestID", d.CorrelationId, "result", res)
+				continue
 			}
 		}
 	}()

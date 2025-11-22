@@ -33,7 +33,7 @@ func SubscribeFeeds(con *amqp091.Connection, subcriberName string) *localFeedsCo
 }
 
 func (c *localFeedsContr) Publish(ctx context.Context, task amqp.FeedsTask) error {
-	corrID := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestID{}).(string)
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -65,7 +65,7 @@ func (c *localFeedsContr) Publish(ctx context.Context, task amqp.FeedsTask) erro
 }
 
 func (c *localFeedsContr) Consume(ctx context.Context, res **amqp.FeedsResult) error {
-	corrID := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestID{}).(string)
 	c.mRes.Lock()
 	ch, ok := c.res[corrID]
 	c.mRes.Unlock()

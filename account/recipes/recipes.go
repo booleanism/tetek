@@ -21,10 +21,10 @@ func New(repo repo.UserRepo) recipes {
 	return recipes{repo}
 }
 
-func (r recipes) Profile(ctx context.Context, user model.User) (model.User, errro.Error) {
-	return (&profileRecipe{r.repo}).Profile(ctx, user)
+func (r recipes) Profile(ctx context.Context, req ProfileRequest) (model.User, errro.Error) {
+	return (&profileRecipe{r.repo}).Profile(ctx, req)
 }
 
-func (r recipes) Regist(ctx context.Context, user model.User) errro.Error {
-	return (&registRecipes{r.repo}).Regist(ctx, user)
+func (r recipes) Regist(ctx context.Context, req RegistRequest) errro.Error {
+	return (&registRecipes{r.repo}).Regist(ctx, req)
 }

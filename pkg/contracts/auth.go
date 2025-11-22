@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	"github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -23,24 +25,22 @@ type localAuthContr struct {
 	mRes sync.Mutex
 }
 
-func SubsribeAuth(con *amqp091.Connection, subcriberName string) *localAuthContr {
-	self := &localAuthContr{con: con, res: make(map[string]chan *amqp.AuthResult)}
-	if err := self.authResListener(subcriberName); err != nil {
-		panic(err)
-	}
-
-	return self
+func SubsribeAuth(con *amqp091.Connection) *localAuthContr {
+	return &localAuthContr{con: con, res: make(map[string]chan *amqp.AuthResult)}
 }
 
 func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error {
-	corrID := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestID{}).(string)
+	_, log := loggr.GetLogger(ctx, "account-task-publisher")
+
 	ch, err := c.con.Channel()
 	if err != nil {
+		log.Error(err, "failed to open channel")
 		return err
 	}
 	defer func() {
 		if err := ch.Close(); err != nil {
-			panic(err)
+			log.Error(err, "failed to close channel")
 		}
 	}()
 
@@ -58,6 +58,7 @@ func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error 
 		Body:          t,
 		ContentType:   "text/json",
 	}); err != nil {
+		log.Error(err, "failed to publish auth task", "task", task)
 		return err
 	}
 
@@ -65,17 +66,23 @@ func (c *localAuthContr) Publish(ctx context.Context, task amqp.AuthTask) error 
 }
 
 func (c *localAuthContr) Consume(ctx context.Context, res **amqp.AuthResult) error {
-	corrID := ctx.Value(keystore.RequestId{}).(string)
+	corrID := ctx.Value(keystore.RequestID{}).(string)
+	_, log := loggr.GetLogger(ctx, "auth-task-publisher")
+
 	c.mRes.Lock()
 	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
-		return errors.New("no result with given correlation id")
+		e := errors.New("no auth result with given correlation id")
+		log.V(1).Info("does not receive account result from chan", "id", corrID, "error", e)
+		return e
 	}
 
 	select {
 	case <-ctx.Done():
-		return errors.New("failed to consume auth result")
+		e := errors.New("failed to consume auth result")
+		log.V(1).Info("receive ctx.Done", "id", corrID, "error", e)
+		return e
 	case *res = <-ch:
 		c.mRes.Lock()
 		delete(c.res, corrID)
@@ -86,7 +93,8 @@ func (c *localAuthContr) Consume(ctx context.Context, res **amqp.AuthResult) err
 	}
 }
 
-func (c *localAuthContr) authResListener(name string) error {
+func (c *localAuthContr) AuthResListener(ctx context.Context, name string) error {
+	_, log := loggr.GetLogger(ctx, "auth-res-listener")
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
@@ -113,38 +121,37 @@ func (c *localAuthContr) authResListener(name string) error {
 
 	go func() {
 		for d := range mgs {
-			c.mRes.Lock()
-			respCh, ok := c.res[d.CorrelationId]
-			c.mRes.Unlock()
-
-			if !ok {
-				if err := d.Nack(false, false); err != nil {
-					continue
-				}
+			if d.ContentType != "text/json" {
+				log.V(1).Info("unexpected ContentType", "requestID", d.CorrelationId, "ContentType", d.ContentType)
+				helper.Nack(log, d, "unexpected ContentType")
 				continue
 			}
 
-			if d.ContentType != "text/json" {
+			c.mRes.Lock()
+			respCh, ok := c.res[d.CorrelationId]
+			c.mRes.Unlock()
+			if !ok {
+				helper.Nack(log, d, "requestID", d.CorrelationId, "res", c.res)
 				continue
 			}
 
 			res := amqp.AuthResult{}
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				if err := d.Nack(false, false); err != nil {
-					continue
-				}
+				log.V(1).Info("failed to marshal auth result", "requestID", d.CorrelationId, "body", d.Body)
+				helper.Nack(log, d, "failed to marshal auth result", "requestID", d.CorrelationId, "body", d.Body)
 				continue
 			}
 
 			select {
 			case respCh <- &res:
 				if err := d.Ack(false); err != nil {
+					log.Error(err, "failed to nack the auth result", "requestID", d.CorrelationId, "message", d)
 					continue
 				}
 			default:
-				if err := d.Nack(false, false); err != nil {
-					continue
-				}
+				helper.Nack(log, d, "cannot sent auth result into result chan", "requestID", d.CorrelationId, "result", res)
+				log.V(1).Info("cannot sent auth result into result chan", "requestID", d.CorrelationId, "result", res)
+				continue
 			}
 		}
 	}()

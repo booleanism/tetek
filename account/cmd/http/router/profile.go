@@ -1,7 +1,6 @@
 package router
 
 import (
-	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
@@ -11,11 +10,12 @@ import (
 
 func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		_, log := loggr.GetLogger(ctx.Context(), "profile-handler")
+		c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+		log.V(1).Info("new profile request")
+
 		gRes := helper.GenericResponse{}
 		req := recipes.ProfileRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
-			log.V(1).Info("failed to bind request", "error", err)
 			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
@@ -23,17 +23,17 @@ func Profile(rec recipes.ProfileRecipes) fiber.Handler {
 			gRes.Code = errro.ErrAccountEmptyParam
 			gRes.Message = "uname empty"
 			e := errro.New(gRes.Code, gRes.Message)
+			log.V(1).Info("missing required field", "error", e)
 			return e.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
-		u, err := rec.Profile(ctx.Context(), model.User{Uname: req.Uname})
+		u, err := rec.Profile(c, req)
 		if err == nil {
+			gRes.Code = errro.Success
+			gRes.Message = "user profiling success"
 			res := recipes.ProfileResponse{
-				GenericResponse: helper.GenericResponse{
-					Code:    errro.Success,
-					Message: "user profiling success",
-				},
-				Detail: u,
+				GenericResponse: gRes,
+				Detail:          u,
 			}
 			return ctx.Status(fiber.StatusOK).JSON(res)
 		}

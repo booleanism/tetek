@@ -9,6 +9,6 @@ import (
 )
 
 func GenerateRequestID(ctx fiber.Ctx) error {
-	ctx.SetContext(context.WithValue(ctx.Context(), keystore.RequestId{}, uuid.NewString()))
+	ctx.SetContext(context.WithValue(ctx.Context(), keystore.RequestID{}, uuid.NewString()))
 	return ctx.Next()
 }

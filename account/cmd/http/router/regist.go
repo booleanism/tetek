@@ -1,27 +1,25 @@
 package router
 
 import (
-	"github.com/booleanism/tetek/account/internal/model"
 	"github.com/booleanism/tetek/account/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
 func Regist(rec recipes.RegistRecipes) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
+		c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+		log.V(1).Info("new registration request")
+
 		gRes := helper.GenericResponse{}
 		req := recipes.RegistRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
 			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
-		err := rec.Regist(ctx, model.User{
-			Uname:  req.Uname,
-			Email:  req.Email,
-			Passwd: req.Passwd,
-		})
-
+		err := rec.Regist(c, req)
 		if err == nil {
 			res := recipes.RegistResponse{
 				GenericResponse: helper.GenericResponse{

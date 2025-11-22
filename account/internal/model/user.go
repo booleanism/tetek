@@ -3,10 +3,10 @@ package model
 import "time"
 
 type User struct {
-	ID        string     `json:"id"`
-	Uname     string     `json:"uname"`
-	Email     string     `json:"email"`
-	Passwd    string     `json:"passwd"`
-	Role      string     `json:"role"`
-	CreatedAt *time.Time `json:"created_at"`
+	ID        string     `json:"id,omitempty"`
+	Uname     string     `json:"uname,omitempty"`
+	Email     string     `json:"email,omitempty"`
+	Passwd    string     `json:"passwd,omitempty"`
+	Role      string     `json:"role,omitempty"`
+	CreatedAt *time.Time `json:"created_at,omitempty"`
 }

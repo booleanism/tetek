@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	LogV        = 3
 	ServiceName = "account"
+	LogV        = 2
 )
 
 func main() {
@@ -51,14 +51,19 @@ func main() {
 		}
 	}()
 
-	auth := contracts.SubsribeAuth(mqCon, ServiceName)
+	baseCtx := context.Background()
+
+	authContr := contracts.SubsribeAuth(mqCon)
+	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
 
 	rep := repo.NewUserRepo(dbPool)
 	rec := recipes.New(rep)
 	acc := contract.NewAccount(mqCon, rep)
 
-	workerCtx := context.Background()
-	workerCtx = logr.NewContext(workerCtx, loggr.NewLogger(ServiceName, &zl))
+	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	ch, err := acc.WorkerAccountListener(workerCtx)
 	if err != nil {
 		panic(err)
@@ -74,8 +79,8 @@ func main() {
 	{
 		api.Use(middlewares.GenerateRequestID)
 		api.Use(middlewares.Logger(ServiceName, &zl))
-		api.Post("/", router.Regist(rec))
-		api.Get("/:uname", middlewares.Auth(auth), router.Profile(rec))
+		api.Post("/", router.Regist(rec)).Name("registration-handler")
+		api.Get("/:uname", middlewares.Auth(authContr), router.Profile(rec)).Name("profile-handler")
 	}
 
 	if err := app.Listen(":8082"); err != nil {

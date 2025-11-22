@@ -1,7 +1,7 @@
 package keystore
 
 type (
-	RequestId struct{}
+	RequestID struct{}
 	AuthRes   struct{}
 	AuthTask  struct{}
 )

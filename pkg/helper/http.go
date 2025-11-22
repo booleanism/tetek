@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
@@ -18,13 +19,16 @@ func (r GenericResponse) JSON() []byte {
 }
 
 func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
+	_, log := loggr.GetLogger(ctx.Context(), "reques-binder")
 	err := ctx.Bind().All(req)
 	if err != nil {
 		r := &GenericResponse{
 			Code:    errro.ErrInvalidRequest,
 			Message: "malformat request, failed to bind the request",
 		}
-		return errro.New(errro.ErrInvalidRequest, "malformat request, failed to bind the request").WithDetail(r.JSON(), errro.TDetailJSON)
+		e := errro.FromError(errro.ErrInvalidRequest, r.Message, err)
+		log.V(1).Info(e.Msg(), "error", err)
+		return e.WithDetail(r.JSON(), errro.TDetailJSON)
 	}
 	return nil
 }

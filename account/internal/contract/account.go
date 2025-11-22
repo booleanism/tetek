@@ -7,6 +7,8 @@ import (
 	"github.com/booleanism/tetek/account/amqp"
 	"github.com/booleanism/tetek/account/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"github.com/jackc/pgx/v5"
@@ -23,7 +25,7 @@ func NewAccount(con *amqp091.Connection, repo repo.UserRepo) *AccContr {
 }
 
 func (c *AccContr) WorkerAccountListener(ctx context.Context) (*amqp091.Channel, error) {
-	_, log := loggr.GetLogger(ctx, "worker")
+	ctx, log := loggr.GetLogger(ctx, "worker")
 	ch, err := c.con.Channel()
 	if err != nil {
 		log.Error(err, "failed to create channel")
@@ -44,43 +46,39 @@ func (c *AccContr) WorkerAccountListener(ctx context.Context) (*amqp091.Channel,
 
 	go func() {
 		for d := range mgs {
-			log = log.WithValues("requestID", d.CorrelationId)
+			ctx = context.WithValue(ctx, keystore.RequestID{}, d.CorrelationId)
 			if d.ContentType != "text/json" {
 				log.V(1).Info("unexpected ContentType", "ContentType", d.ContentType)
-				if err := d.Nack(false, false); err != nil {
-					log.Error(err, "failed to nack account task", "body", d.Body, "ContentType", d.ContentType)
-				}
+				helper.Nack(log, d, "unexpected ContentType", "requestID", d.CorrelationId)
 				continue
 			}
 
 			task := amqp.AccountTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
-				log.V(1).Info("failed to marshal account task", "error", err, "body", d.Body)
+				log.V(1).Info("failed to marshal account task", "requestID", d.CorrelationId, "error", err, "body", d.Body)
 				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountParseFail, Message: "error parsing account task"})
-				resultPublisher(log, task, ch, d, res)
+				accountResultPublisher(log, task, ch, d, res, err)
 				continue
 			}
 
 			if task.Cmd == 0 {
-				u, err := c.repo.GetUser(context.Background(), task.User)
+				u := &task.User
+				err := c.repo.GetUser(ctx, &u)
 				if err == nil {
-					log.V(2).Info("user found", "task", task)
-					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.Success, Message: "user found", Detail: u})
-					resultPublisher(log, task, ch, d, res)
+					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.Success, Message: "user found", Detail: *u})
+					accountResultPublisher(log, task, ch, d, res, err)
 					continue
 				}
 
 				if err == pgx.ErrNoRows {
-					log.V(2).Info("no user", "error", err, "task", task)
 					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountNoUser, Message: "user not found", Detail: task.User})
-					resultPublisher(log, task, ch, d, res)
+					accountResultPublisher(log, task, ch, d, res, err)
 					continue
 				}
 
-				log.Error(err, "unexpected error", "task", task)
 				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountDBError, Message: "something happen in our end", Detail: task.User})
-				resultPublisher(log, task, ch, d, res)
+				accountResultPublisher(log, task, ch, d, res, err)
 				continue
 			}
 		}
@@ -89,8 +87,8 @@ func (c *AccContr) WorkerAccountListener(ctx context.Context) (*amqp091.Channel,
 	return ch, nil
 }
 
-func resultPublisher(log logr.Logger, task amqp.AccountTask, ch *amqp091.Channel, d amqp091.Delivery, res []byte) {
-	log = log.WithName("result-publisher")
+func accountResultPublisher(log logr.Logger, task any, ch *amqp091.Channel, d amqp091.Delivery, res []byte, e error) {
+	log = log.WithName("account-result-publisher")
 	err := ch.Publish(amqp.AccountExchange, amqp.AccountResRk, false, false, amqp091.Publishing{
 		CorrelationId: d.CorrelationId,
 		Body:          res,
@@ -98,9 +96,12 @@ func resultPublisher(log logr.Logger, task amqp.AccountTask, ch *amqp091.Channel
 	})
 	if err != nil {
 		log.Error(err, "failed to publish account result", "result", res, "exchange", amqp.AccountExchange, "routing-key", amqp.AccountResRk)
-		if err := d.Nack(false, false); err != nil {
-			log.Error(err, "failed to nack account task", "task", task)
-		}
+		helper.Nack(log, d, "unable to publish account result", "task", task)
+		return
+	}
+
+	if e != nil {
+		helper.Nack(log, d, e.Error(), "task", task)
 		return
 	}
 
