@@ -1,54 +1,31 @@
 package router
 
 import (
-	"encoding/json"
 	"fmt"
 
-	"github.com/booleanism/tetek/account/amqp"
 	"github.com/booleanism/tetek/auth/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
-type loginRequest struct {
-	Uname  string `json:"uname"`
-	Email  string `json:"email"`
-	Passwd string `json:"passwd"`
-}
-
-type loginResponse struct {
-	Code    int          `json:"code"`
-	Message string       `json:"message"`
-	Detail  loginRequest `json:"detail"`
-}
-
-func (r loginResponse) JSON() []byte {
-	j, _ := json.Marshal(r)
-	return j
-}
-
-func (req loginRequest) toUser() amqp.User {
-	return amqp.User{
-		Uname:  req.Uname,
-		Email:  req.Email,
-		Passwd: req.Passwd,
-	}
-}
-
 func Login(logRec recipes.LoginRecipe) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
-		req := loginRequest{}
+		c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+		log.V(1).Info("new login request")
+
+		req := recipes.LoginRequest{}
 		if err := helper.BindRequest(ctx, &req); err != nil {
 			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
 
-		jwt, err := logRec.Login(ctx.Context(), req.toUser())
+		jwt, err := logRec.Login(c, req)
 		if err == nil {
-			res := loginResponse{
+			res := recipes.LoginResponse{
 				Code:    errro.Success,
 				Message: "login success",
-				Detail: loginRequest{
+				Detail: recipes.LoginRequest{
 					Uname: req.Uname,
 					Email: req.Email,
 				},
@@ -57,10 +34,9 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 			return ctx.Status(fiber.StatusOK).JSONP(res)
 		}
 
-		res := loginResponse{
+		res := recipes.LoginResponse{
 			Code:    err.Code(),
 			Message: err.Error(),
-			Detail:  req,
 		}
 		if err.Code() == errro.ErrAuthJWTGenerationFail || err.Code() == errro.ErrAccountServiceUnavailable {
 			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
@@ -78,10 +54,9 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 			return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusUnauthorized)
 		}
 
-		res = loginResponse{
+		res = recipes.LoginResponse{
 			Code:    errro.ErrAccountCantLogin,
 			Message: "failed to proccess login request",
-			Detail:  req,
 		}
 		return err.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}

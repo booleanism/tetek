@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/booleanism/tetek/auth/cmd/http/router"
@@ -9,6 +10,8 @@ import (
 	"github.com/booleanism/tetek/auth/recipes"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
+	"github.com/booleanism/tetek/pkg/loggr"
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
@@ -17,7 +20,7 @@ import (
 
 const (
 	ServiceName = "auth"
-	LogV        = 4
+	LogV        = 2
 )
 
 func main() {
@@ -46,7 +49,11 @@ func main() {
 
 	jwt := jwt.NewJwt([]byte(jwtSecret))
 	auth := contract.NewAuth(mqCon, jwt)
-	ch, err := auth.WorkerAuthListener()
+
+	baseCtx := context.Background()
+
+	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	ch, err := auth.WorkerAuthListener(workerCtx)
 	if err != nil {
 		panic(err)
 	}
@@ -56,7 +63,13 @@ func main() {
 		}
 	}()
 
-	accContr := contracts.SubscribeAccount(mqCon, "auth")
+	accContr := contracts.SubscribeAccount(mqCon)
+
+	accLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := accContr.AccountResListener(accLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
+
 	logRec := recipes.NewLogin(accContr, jwt)
 
 	app := fiber.New()
@@ -64,7 +77,7 @@ func main() {
 	{
 		api.Use(middlewares.GenerateRequestID)
 		api.Use(middlewares.Logger(ServiceName, &zl))
-		api.Post("/", router.Login(logRec))
+		api.Post("/", router.Login(logRec)).Name("login-handler")
 	}
 
 	if err := app.Listen(":8081"); err != nil {

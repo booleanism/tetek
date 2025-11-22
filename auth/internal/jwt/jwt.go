@@ -1,15 +1,18 @@
 package jwt
 
 import (
+	"context"
 	"errors"
 	"time"
 
 	"github.com/booleanism/tetek/account/amqp"
+	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type JwtRecipes interface {
-	Verify(string) (*JwtClaims, error)
+	Verify(context.Context, string) (*JwtClaims, error)
 	Generate(amqp.User) (string, error)
 }
 
@@ -30,25 +33,34 @@ func NewJwt(secr []byte) *jwtRecipe {
 	return &jwtRecipe{secr}
 }
 
-func (r *jwtRecipe) Verify(j string) (*JwtClaims, error) {
+func (r *jwtRecipe) Verify(ctx context.Context, j string) (*JwtClaims, error) {
+	corrID := ctx.Value(keystore.RequestID{}).(string)
+	_, log := loggr.GetLogger(ctx, "verifier")
 	token, err := jwt.ParseWithClaims(j, &JwtClaims{}, func(token *jwt.Token) (any, error) {
 		return r.secrt, nil
 	})
 	if err != nil {
-		return nil, errors.New("fail to parse JWT")
+		log.V(2).Info("failed to parse JWT", "requestID", corrID, "error", err)
+		return nil, err
 	}
 
 	c, ok := token.Claims.(*JwtClaims)
 	if !token.Valid || !ok {
-		return nil, errors.New("invalid token")
+		e := errors.New("invalid claims")
+		log.V(2).Info("missmatch claims type", "requestID", corrID, "error", e, "claims", token.Claims)
+		return nil, e
 	}
 
 	if c.Subject != "auth" {
-		return nil, errors.New("invalid subject")
+		e := errors.New("invalid subject claims")
+		log.V(2).Info("expected auth subject", "requestID", corrID, "error", e, "subject", c.Subject)
+		return nil, e
 	}
 
 	if time.Now().After(c.ExpiresAt.Time) {
-		return nil, errors.New("token expired")
+		e := errors.New("token expired")
+		log.V(2).Info("expiration time exceeded", "requestID", corrID, "error", e, "exp", token.Claims, "now", time.Now())
+		return nil, e
 	}
 
 	return c, nil
