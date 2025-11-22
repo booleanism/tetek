@@ -96,7 +96,7 @@ func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
 		cto, cancel := context.WithTimeout(
 			c,
-			5*time.Second,
+			helper.Timeout,
 		)
 		defer cancel()
 

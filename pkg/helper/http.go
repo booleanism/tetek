@@ -2,11 +2,14 @@ package helper
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
+
+const Timeout = 5 * time.Second
 
 type GenericResponse struct {
 	Code    int    `json:"code"`
