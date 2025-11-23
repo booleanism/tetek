@@ -7,7 +7,6 @@ import (
 	"github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"golang.org/x/crypto/bcrypt"
@@ -34,9 +33,6 @@ func (r *loginRecipe) Login(ctx context.Context, req LoginRequest) (string, errr
 	if err := checkLoginProperty(log, &user); err != nil {
 		return "", err
 	}
-
-	ctx, cancel := context.WithTimeout(ctx, helper.Timeout)
-	defer cancel()
 
 	res := &amqp.AccountRes{}
 	task := amqp.AccountTask{Cmd: 0, User: *user}

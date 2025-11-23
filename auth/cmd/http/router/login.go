@@ -1,6 +1,7 @@
 package router
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/booleanism/tetek/auth/recipes"
@@ -19,6 +20,9 @@ func Login(logRec recipes.LoginRecipe) fiber.Handler {
 		if err := helper.BindRequest(ctx, &req); err != nil {
 			return err.SendError(ctx, fiber.StatusBadRequest)
 		}
+
+		c, cancel := context.WithTimeout(c, helper.Timeout)
+		defer cancel()
 
 		jwt, err := logRec.Login(c, req)
 		if err == nil {
