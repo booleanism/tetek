@@ -51,6 +51,7 @@ const (
 	ErrInvalidRequest = ErrAccountParseFail
 	ErrLogging        = -9
 	ErrTimeout        = -13
+	ErrAcqPool        = -18
 )
 
 const (

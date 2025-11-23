@@ -2,6 +2,7 @@ package loggr
 
 import (
 	"context"
+	"os"
 
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
@@ -13,7 +14,11 @@ func NewLogger(name string, base *zerolog.Logger) logr.Logger {
 }
 
 func GetLogger(ctx context.Context, scope string) (context.Context, logr.Logger) {
-	log, _ := logr.FromContext(ctx)
+	log, err := logr.FromContext(ctx)
+	if err != nil {
+		zl := zerolog.New(os.Stderr)
+		log = NewLogger(scope, &zl)
+	}
 	// up log to use with serive name
 	log = log.WithName(scope)
 

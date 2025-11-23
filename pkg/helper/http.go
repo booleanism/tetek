@@ -22,7 +22,7 @@ func (r GenericResponse) JSON() []byte {
 }
 
 func BindRequest(ctx fiber.Ctx, req any) errro.ResError {
-	_, log := loggr.GetLogger(ctx.Context(), "reques-binder")
+	_, log := loggr.GetLogger(ctx.Context(), "request-binder")
 	err := ctx.Bind().All(req)
 	if err != nil {
 		r := &GenericResponse{
