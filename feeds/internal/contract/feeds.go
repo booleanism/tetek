@@ -6,6 +6,7 @@ import (
 
 	"github.com/booleanism/tetek/feeds/amqp"
 	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/pools"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/jackc/pgx/v5"
@@ -61,49 +62,62 @@ func (c *FeedsContr) WorkerFeedsListener() (*amqp091.Channel, error) {
 			}
 
 			if task.Cmd == 0 {
-				ff := repo.FeedsFilter{ID: task.ID}
-				u, err := c.repo.Feeds(context.Background(), ff)
-				if err == nil {
-					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.Success, Message: "feeds found", Detail: u[len(u)-1]})
+				func() {
+					ff := repo.FeedsFilter{ID: task.ID}
+					fBuf, ok := pools.FeedsPool.Get().(*pools.Feeds)
+					if !ok {
+						// TODO: logging
+						if err := d.Nack(false, false); err != nil {
+							return
+						}
+						return
+					}
+					defer pools.FeedsPool.Put(fBuf)
+					defer fBuf.Reset()
+
+					err := c.repo.Feeds(context.Background(), ff, &fBuf.Value)
+					if err == nil {
+						res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.Success, Message: "feeds found", Detail: fBuf.Value[len(fBuf.Value)-1]})
+						if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
+							CorrelationId: d.CorrelationId,
+							Body:          res,
+							ContentType:   "text/json",
+						}); err != nil {
+							return
+						}
+						if err := d.Ack(false); err != nil {
+							return
+						}
+						return
+					}
+
+					if err == pgx.ErrNoRows {
+						res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsNoFeeds, Message: "feeds not found", Detail: model.Feed{ID: ff.ID}})
+						if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
+							CorrelationId: d.CorrelationId,
+							Body:          res,
+							ContentType:   "text/json",
+						}); err != nil {
+							return
+						}
+						if err := d.Ack(false); err != nil {
+							return
+						}
+						return
+					}
+
+					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsDBError, Message: "something happen in our end", Detail: model.Feed{ID: ff.ID}})
 					if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
 						CorrelationId: d.CorrelationId,
 						Body:          res,
 						ContentType:   "text/json",
 					}); err != nil {
-						continue
+						return
 					}
 					if err := d.Ack(false); err != nil {
-						continue
+						return
 					}
-					continue
-				}
-
-				if err == pgx.ErrNoRows {
-					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsNoFeeds, Message: "feeds not found", Detail: model.Feed{ID: ff.ID}})
-					if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
-						CorrelationId: d.CorrelationId,
-						Body:          res,
-						ContentType:   "text/json",
-					}); err != nil {
-						continue
-					}
-					if err := d.Ack(false); err != nil {
-						continue
-					}
-					continue
-				}
-
-				res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsDBError, Message: "something happen in our end", Detail: model.Feed{ID: ff.ID}})
-				if err := ch.Publish(amqp.FeedsExchange, amqp.FeedsResRk, false, false, amqp091.Publishing{
-					CorrelationId: d.CorrelationId,
-					Body:          res,
-					ContentType:   "text/json",
-				}); err != nil {
-					continue
-				}
-				if err := d.Ack(false); err != nil {
-					continue
-				}
+				}()
 			}
 		}
 	}()

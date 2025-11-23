@@ -2,15 +2,18 @@ package router
 
 import (
 	"context"
-	"time"
 
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
 func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
+	c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+	log.V(1).Info("new new feed request")
+
 	req := recipes.NewFeedRequest{}
 	gRes := helper.GenericResponse{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
@@ -18,8 +21,8 @@ func (fr FeedsRouter) NewFeed(ctx fiber.Ctx) error {
 	}
 
 	cto, cancel := context.WithTimeout(
-		ctx.Context(),
-		TIMEOUT*time.Second)
+		c,
+		helper.Timeout)
 	defer cancel()
 
 	err := fr.rec.New(cto, req)

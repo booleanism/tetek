@@ -7,6 +7,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -23,10 +24,10 @@ type FeedsFilter struct {
 const limit = 30
 
 type FeedsRepo interface {
-	Feeds(context.Context, FeedsFilter) ([]model.Feed, error)
-	NewFeed(context.Context, model.Feed) (model.Feed, error)
-	DeleteFeed(context.Context, FeedsFilter) (model.Feed, error)
-	HideFeed(context.Context, HiddenFeeds) (HiddenFeeds, error)
+	Feeds(context.Context, FeedsFilter, *[]model.Feed) error
+	NewFeed(context.Context, **model.Feed) error
+	DeleteFeed(context.Context, FeedsFilter, **model.Feed) error
+	HideFeed(context.Context, **model.HiddenFeed) error
 }
 
 type feedsRepo struct {
@@ -38,10 +39,11 @@ func New(pool db.Acquireable, sq squirrel.StatementBuilderType) *feedsRepo {
 	return &feedsRepo{pool, sq}
 }
 
-func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter) ([]model.Feed, error) {
+func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter, feedsBuf *[]model.Feed) error {
+	ctx, log := loggr.GetLogger(ctx, "getFeeds-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer q.Release()
 
@@ -81,56 +83,71 @@ func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter) ([]model.Feed, er
 
 	sql, args, err := base.ToSql()
 	if err != nil {
-		return nil, err
+		log.Error(err, "failed to build sql queries", "filter", ff)
+		return err
 	}
 
 	rws, err := q.Query(ctx, sql, args...)
 	if err != nil {
-		return nil, err
+		log.Error(err, "failed to execute sql queries", "filter", ff)
+		return err
 	}
 
 	defer rws.Close()
-	return scanRows(rws)
+	return scanRows(ctx, rws, ff, feedsBuf)
 }
 
-func scanRows(rws pgx.Rows) ([]model.Feed, error) {
-	feeds := []model.Feed{}
+func scanRows(ctx context.Context, rws pgx.Rows, ff FeedsFilter, buf *[]model.Feed) error {
+	_, log := loggr.GetLogger(ctx, "feedsScanner-repo")
+	// feeds := []model.Feed{}
 	n := 0
 	for rws.Next() {
 		f := model.Feed{}
 		if err := rws.Scan(&f.ID, &f.Title, &f.URL, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.CreatedAt); err != nil {
-			return nil, err
+			log.Error(err, "error occours scanning feeds rows")
+			return err
 		}
-		feeds = append(feeds, f)
+		*buf = append(*buf, f)
 		n++
 	}
 
 	if n == 0 {
-		return nil, pgx.ErrNoRows
+		log.V(1).Info("zero row feeds", "filter", ff)
+		return pgx.ErrNoRows
 	}
 
-	return feeds, nil
+	err := rws.Err()
+	if err != nil {
+		log.Error(err, "error occours after scanning feeds rows")
+		return err
+	}
+
+	return nil
 }
 
-func (r *feedsRepo) NewFeed(ctx context.Context, feed model.Feed) (model.Feed, error) {
+func (r *feedsRepo) NewFeed(ctx context.Context, feed **model.Feed) error {
+	ctx, log := loggr.GetLogger(ctx, "newFeed-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
-		return model.Feed{}, err
+		return err
 	}
 	defer q.Release()
 
-	f := model.Feed{}
 	err = q.QueryRow(ctx, "INSERT INTO feeds (id, title, url, text, by, type, points, n_comments, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *",
-		feed.ID, feed.Title, feed.URL, feed.Text, feed.By, feed.Type, feed.Points, feed.NCommnents, feed.CreatedAt,
-	).Scan(&f.ID, &f.Title, &f.URL, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.CreatedAt, &f.DeletedAt)
+		&(*feed).ID, &(*feed).Title, &(*feed).URL, &(*feed).Text, &(*feed).By, &(*feed).Type, &(*feed).Points, &(*feed).NCommnents, &(*feed).CreatedAt,
+	).Scan(&(*feed).ID, &(*feed).Title, &(*feed).URL, &(*feed).Text, &(*feed).By, &(*feed).Type, &(*feed).Points, &(*feed).NCommnents, &(*feed).CreatedAt, &(*feed).DeletedAt)
+	if err != nil {
+		log.Error(err, "failed to insert into feeds", "model", feed)
+	}
 
-	return f, err
+	return err
 }
 
-func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter) (model.Feed, error) {
+func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter, feed **model.Feed) error {
+	ctx, log := loggr.GetLogger(ctx, "deleteFeed-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
-		return model.Feed{}, err
+		return err
 	}
 	defer q.Release()
 
@@ -145,13 +162,16 @@ func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter) (model.Feed,
 	final := base.Suffix("RETURNING deleted_at")
 	sql, args, err := final.ToSql()
 	if err != nil {
-		return model.Feed{}, err
+		log.Error(err, "failed to build sql queries", "filter", ff)
+		return err
 	}
 
-	f := model.Feed{}
 	err = q.QueryRow(
 		ctx, sql, args...,
-	).Scan(&f.DeletedAt)
+	).Scan(&(*feed).DeletedAt)
+	if err != nil {
+		log.Error(err, "failed to update feed state into deleted feed", "filter", ff)
+	}
 
-	return f, err
+	return err
 }

@@ -2,15 +2,14 @@ package router
 
 import (
 	"context"
-	"time"
 
+	"github.com/booleanism/tetek/feeds/internal/pools"
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
-
-const TIMEOUT = 10
 
 type FeedsRouter struct {
 	rec recipes.FeedRecipes
@@ -21,6 +20,9 @@ func NewFeedRouter(rec recipes.FeedRecipes) FeedsRouter {
 }
 
 func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
+	c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+	log.V(1).Info("new get feed request")
+
 	req := recipes.GetFeedsRequest{}
 	gRes := helper.GenericResponse{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
@@ -28,17 +30,27 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 	}
 
 	cto, cancel := context.WithTimeout(
-		ctx.Context(),
-		TIMEOUT*time.Second)
+		c,
+		helper.Timeout)
 	defer cancel()
 
-	f, err := fr.rec.Feeds(cto, req)
+	fBuf, ok := pools.FeedsPool.Get().(*pools.Feeds)
+	if !ok {
+		gRes.Code = errro.ErrAcqPool
+		gRes.Message = "failed to acquire pool"
+		e := errro.New(gRes.Code, gRes.Message)
+		return e.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
+	}
+	defer pools.FeedsPool.Put(fBuf)
+	defer fBuf.Reset()
+
+	err := fr.rec.Feeds(cto, req, fBuf)
 	if err == nil {
 		gRes.Code = errro.Success
 		gRes.Message = "fetch feeds success"
 		res := recipes.GetFeedsResponse{
 			GenericResponse: gRes,
-			Detail:          f,
+			Detail:          fBuf.Value,
 		}
 		return ctx.Status(fiber.StatusOK).JSON(&res)
 	}

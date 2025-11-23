@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/Masterminds/squirrel"
@@ -12,12 +13,24 @@ import (
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
+	"github.com/booleanism/tetek/pkg/loggr"
+	"github.com/go-logr/logr"
+	"github.com/go-logr/zerologr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/cors"
 	"github.com/rabbitmq/amqp091-go"
+	"github.com/rs/zerolog"
+)
+
+const (
+	ServiceName = "feeds"
+	LogV        = 2
 )
 
 func main() {
+	zl := zerolog.New(os.Stderr)
+	zerologr.SetMaxV(LogV)
+
 	dbStr := os.Getenv("FEEDS_DB_STR")
 	if dbStr == "" {
 		panic("feeds database string empty")
@@ -38,8 +51,21 @@ func main() {
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
 	repo := repo.New(dbPool, sq)
-	acc := contracts.SubscribeAccount(mqCon, "feeds")
-	auth := contracts.SubsribeAuth(mqCon, "feeds")
+
+	baseCtx := context.Background()
+
+	acc := contracts.SubscribeAccount(mqCon)
+	accLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := acc.AccountResListener(accLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
+
+	authContr := contracts.SubsribeAuth(mqCon)
+	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
+
 	rec := recipes.NewRecipes(repo, acc)
 
 	feedsContr := contract.NewFeeds(mqCon, repo)
@@ -57,21 +83,24 @@ func main() {
 
 	apiEp.Use(cors.New())
 	apiEp.Use(middlewares.GenerateRequestID)
+	apiEp.Use(middlewares.Logger(ServiceName, &zl))
 
-	apiEp.Get("openapi.yaml", func(ctx fiber.Ctx) error {
-		return ctx.SendString(d())
-	})
+	{
+		apiEp.Get("openapi.yaml", func(ctx fiber.Ctx) error {
+			return ctx.SendString(d())
+		})
 
-	apiEp.Get("docs/", func(ctx fiber.Ctx) error {
-		ctx.Set("Content-Type", "text/html")
+		apiEp.Get("docs/", func(ctx fiber.Ctx) error {
+			ctx.Set("Content-Type", "text/html")
 
-		return ctx.SendString(ui)
-	})
+			return ctx.SendString(ui)
+		})
 
-	apiEp.Get("/", middlewares.Auth(auth), router.GetFeeds)
-	apiEp.Post("/", middlewares.Auth(auth), router.NewFeed)
-	apiEp.Delete("/:id", middlewares.Auth(auth), router.DeleteFeed)
-	apiEp.Patch("/hide", middlewares.Auth(auth), router.HideFeed)
+		apiEp.Get("/", middlewares.Auth(authContr), router.GetFeeds).Name("getFeeds-handler")
+		apiEp.Post("/", middlewares.Auth(authContr), router.NewFeed).Name("newFeed-handler")
+		apiEp.Delete("/:id", middlewares.Auth(authContr), router.DeleteFeed).Name("deleteFeed-handler")
+		apiEp.Patch("/hide", middlewares.Auth(authContr), router.HideFeed).Name("hideFeed-handler")
+	}
 
 	if err := app.Listen(":8083"); err != nil {
 		panic(err)

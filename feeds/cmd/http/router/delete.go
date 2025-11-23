@@ -2,24 +2,27 @@ package router
 
 import (
 	"context"
-	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
 func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
+	c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+	log.V(1).Info("new delete feed request")
+
 	req := recipes.DeleteRequest{}
 	gRes := helper.GenericResponse{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	jwt, ok := ctx.Context().Value(keystore.AuthRes{}).(*amqp.AuthResult)
+	jwt, ok := c.Value(keystore.AuthRes{}).(*amqp.AuthResult)
 	if !ok {
 		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "missing jwt"
@@ -27,7 +30,7 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 		return e.SendError(ctx, fiber.StatusUnauthorized)
 	}
 
-	cto, cancel := context.WithTimeout(ctx.Context(), TIMEOUT*time.Second)
+	cto, cancel := context.WithTimeout(c, helper.Timeout)
 	defer cancel()
 
 	err := fr.rec.Delete(cto, req)

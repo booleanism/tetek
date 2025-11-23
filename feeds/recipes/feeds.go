@@ -6,18 +6,19 @@ import (
 	"strings"
 
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
-	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/pools"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type FeedRecipes interface {
-	Feeds(context.Context, GetFeedsRequest) ([]model.Feed, errro.Error)
+	Feeds(context.Context, GetFeedsRequest, *pools.Feeds) errro.Error
 	New(context.Context, NewFeedRequest) errro.Error
 	Delete(context.Context, DeleteRequest) errro.Error
 	Hide(context.Context, HideRequest) errro.Error
@@ -32,7 +33,7 @@ func NewRecipes(repo repo.FeedsRepo, accContr contracts.AccountSubscribe) *feedR
 	return &feedRecipes{repo, accContr}
 }
 
-func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest) ([]model.Feed, errro.Error) {
+func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest, f *pools.Feeds) errro.Error {
 	ff := repo.FeedsFilter{
 		Offset: uint64(req.Offset),
 		Type:   req.Type,
@@ -49,38 +50,41 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest) ([]model.
 	}
 	ff.Type = strings.ToUpper(ff.Type)
 
-	f, er := fr.repo.Feeds(ctx, ff)
+	er := fr.repo.Feeds(ctx, ff, &f.Value)
 	if er != nil {
 		var pgErr *pgconn.PgError
 		if !errors.As(er, &pgErr) {
 			e := errro.FromError(errro.ErrFeedsDBError, "error fetching feeds", er)
-			return nil, e
+			return e
 		}
 
 		if pgErr.Code == "23505" {
 			e := errro.New(errro.ErrFeedsNoFeeds, "no feed(s) found")
-			return nil, e
+			return e
 		}
 	}
 
-	if len(f) == 0 {
+	if len(f.Value) == 0 {
 		e := errro.New(errro.ErrFeedsNoFeeds, "no feed(s) found")
-		return nil, e
+		return e
 	}
 
-	return f, nil
+	return nil
 }
 
 func (fr *feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error {
-	rFeed := req.ToFeed()
+	ctx, _ = loggr.GetLogger(ctx, "newFeed-recipes")
+
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
 
+	rFeed := req.ToFeed()
 	rFeed.By = jwt.Claims.Uname
 	rFeed.Type = strings.ToUpper(rFeed.Type)
+	f := &rFeed
 
-	_, er := fr.repo.NewFeed(ctx, rFeed)
-	if er != nil {
-		e := errro.FromError(errro.ErrFeedsDBError, "could not insert new feed", er)
+	err := fr.repo.NewFeed(ctx, &f)
+	if err != nil {
+		e := errro.FromError(errro.ErrFeedsDBError, "could not insert new feed", err)
 		return e
 	}
 
@@ -103,17 +107,26 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 		ff.By = jwt.Claims.Uname
 	}
 
-	fDel, er := fr.repo.DeleteFeed(ctx, ff)
-	if er == nil {
+	fBuf, ok := pools.FeedsPool.Get().(*pools.Feeds)
+	if !ok {
+		e := errro.New(errro.ErrAcqPool, "failed to acquire pool")
+		return e
+	}
+	defer pools.FeedsPool.Put(fBuf)
+	defer fBuf.Reset()
+
+	f := &(*fBuf).Value[0]
+	err := fr.repo.DeleteFeed(ctx, ff, &f)
+	if err == nil {
 		return nil
 	}
 
-	if er == pgx.ErrNoRows {
+	if err == pgx.ErrNoRows {
 		e := errro.New(errro.ErrFeedsNoFeeds, "failed to delete feed: no row")
 		return e
 	}
 
-	if fDel.DeletedAt == nil {
+	if f.DeletedAt == nil {
 		e := errro.New(errro.ErrFeedsNoFeeds, "no such feed")
 		return e
 	}
@@ -126,13 +139,20 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 // Validate feed by req.Id
 func (fr *feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
-	hf := repo.HiddenFeeds{
-		ID:     uuid.NewString(),
-		To:     jwt.Claims.Uname,
-		FeedID: req.ID,
+	hfBuf, ok := pools.HiddenFeedsPool.Get().(*pools.HiddenFeeds)
+	if !ok {
+		e := errro.New(errro.ErrAcqPool, "failed to acquire pool")
+		return e
 	}
+	defer pools.HiddenFeedsPool.Put(hfBuf)
+	defer hfBuf.Reset()
 
-	_, er := fr.repo.HideFeed(ctx, hf)
+	hf := &hfBuf.Value[0]
+	hf.ID = uuid.NewString()
+	hf.To = jwt.Claims.Uname
+	hf.FeedID = req.ID
+
+	er := fr.repo.HideFeed(ctx, &hf)
 	if er != nil {
 		e := errro.FromError(errro.ErrFeedsDBError, "unable to hide feed", er)
 		return e

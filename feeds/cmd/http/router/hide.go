@@ -2,24 +2,27 @@ package router
 
 import (
 	"context"
-	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/gofiber/fiber/v3"
 )
 
 func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
+	c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
+	log.V(1).Info("new hide feed request")
+
 	req := recipes.HideRequest{}
 	gRes := helper.GenericResponse{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	_, ok := ctx.Context().Value(keystore.AuthRes{}).(*amqp.AuthResult)
+	_, ok := c.Value(keystore.AuthRes{}).(*amqp.AuthResult)
 	if !ok {
 		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "does not represent jwt type"
@@ -28,8 +31,8 @@ func (fr FeedsRouter) HideFeed(ctx fiber.Ctx) error {
 	}
 
 	cto, cancel := context.WithTimeout(
-		ctx.Context(),
-		TIMEOUT*time.Second)
+		c,
+		helper.Timeout)
 	defer cancel()
 
 	err := fr.rec.Hide(cto, req)
