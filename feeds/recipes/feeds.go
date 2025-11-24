@@ -2,19 +2,20 @@ package recipes
 
 import (
 	"context"
-	"errors"
 	"strings"
 
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
+	"github.com/booleanism/tetek/comments/amqp"
+	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/pools"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type FeedRecipes interface {
@@ -22,18 +23,20 @@ type FeedRecipes interface {
 	New(context.Context, NewFeedRequest) errro.Error
 	Delete(context.Context, DeleteRequest) errro.Error
 	Hide(context.Context, HideRequest) errro.Error
+	Shows(context.Context, ShowFeedRequest, **model.FeedWithComments) errro.Error
 }
 
 type feedRecipes struct {
-	repo     repo.FeedsRepo
-	accContr contracts.AccountSubscribe
+	repo      repo.FeedsRepo
+	commContr contracts.CommentsSubscribe
 }
 
-func NewRecipes(repo repo.FeedsRepo, accContr contracts.AccountSubscribe) *feedRecipes {
-	return &feedRecipes{repo, accContr}
+func NewRecipes(repo repo.FeedsRepo, commContr contracts.CommentsSubscribe) feedRecipes {
+	return feedRecipes{repo, commContr}
 }
 
-func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest, f *pools.Feeds) errro.Error {
+func (fr feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest, f *pools.Feeds) errro.Error {
+	ctx, _ = loggr.GetLogger(ctx, "getFeeds-recipes")
 	ff := repo.FeedsFilter{
 		Offset: uint64(req.Offset),
 		Type:   req.Type,
@@ -50,21 +53,21 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest, f *pools.
 	}
 	ff.Type = strings.ToUpper(ff.Type)
 
-	er := fr.repo.Feeds(ctx, ff, &f.Value)
-	if er != nil {
-		var pgErr *pgconn.PgError
-		if !errors.As(er, &pgErr) {
-			e := errro.FromError(errro.ErrFeedsDBError, "error fetching feeds", er)
-			return e
-		}
+	return fr.getFeeds(ctx, ff, &f.Value)
+}
 
-		if pgErr.Code == "23505" {
-			e := errro.New(errro.ErrFeedsNoFeeds, "no feed(s) found")
-			return e
-		}
+func (fr feedRecipes) getFeeds(ctx context.Context, ff repo.FeedsFilter, f *[]model.Feed) errro.Error {
+	err := fr.repo.Feeds(ctx, ff, f)
+	if err == nil && len(*f) != 0 {
+		return nil
 	}
 
-	if len(f.Value) == 0 {
+	if err != pgx.ErrNoRows {
+		e := errro.FromError(errro.ErrFeedsDBError, "error fetching feeds", err)
+		return e
+	}
+
+	if len(*f) == 0 || err == pgx.ErrNoRows {
 		e := errro.New(errro.ErrFeedsNoFeeds, "no feed(s) found")
 		return e
 	}
@@ -72,7 +75,7 @@ func (fr *feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest, f *pools.
 	return nil
 }
 
-func (fr *feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error {
+func (fr feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error {
 	ctx, _ = loggr.GetLogger(ctx, "newFeed-recipes")
 
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
@@ -91,7 +94,7 @@ func (fr *feedRecipes) New(ctx context.Context, req NewFeedRequest) errro.Error 
 	return nil
 }
 
-func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Error {
+func (fr feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Error {
 	ff := repo.FeedsFilter{
 		ID: req.ID,
 	}
@@ -137,7 +140,7 @@ func (fr *feedRecipes) Delete(ctx context.Context, req DeleteRequest) errro.Erro
 
 // TODO:
 // Validate feed by req.Id
-func (fr *feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
+func (fr feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
 	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
 	hfBuf, ok := pools.HiddenFeedsPool.Get().(*pools.HiddenFeeds)
 	if !ok {
@@ -157,6 +160,44 @@ func (fr *feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
 		e := errro.FromError(errro.ErrFeedsDBError, "unable to hide feed", er)
 		return e
 	}
+
+	return nil
+}
+
+func (fr feedRecipes) Shows(ctx context.Context, req ShowFeedRequest, f **model.FeedWithComments) errro.Error {
+	ctx, log := loggr.GetLogger(ctx, "showsFeed-recipes")
+	t := amqp.CommentsTask{
+		Cmd: 0,
+		Comment: amqp.Comment{
+			Parent: req.ID,
+		},
+	}
+
+	fBuf, ok := pools.FeedsPool.Get().(*pools.Feeds)
+	if !ok {
+		e := errro.New(errro.ErrAcqPool, "failed to acquire pool")
+		log.Error(e, e.Msg(), "task", t)
+		return e
+	}
+
+	defer pools.FeedsPool.Put(fBuf)
+	defer fBuf.Reset()
+
+	ff := repo.FeedsFilter{ID: req.ID}
+
+	if err := fr.getFeeds(ctx, ff, &fBuf.Value); err != nil {
+		return err
+	}
+
+	res := &amqp.CommentsResult{}
+	if err := fr.commAdapter(ctx, t, &res); err != nil {
+		return err
+	}
+
+	comms := helper.BuildCommentTree(res.Details, fBuf.Value[0].ID)
+
+	(*f).Feed = fBuf.Value[0]
+	(*f).Comments = comms
 
 	return nil
 }

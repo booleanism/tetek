@@ -17,12 +17,21 @@ type GetFeedsRequest struct {
 
 type GetFeedsResponse struct {
 	helper.GenericResponse
-	Detail []model.Feed `json:"detail"`
+	Details []model.Feed `json:"details"`
 }
 
 func (r GetFeedsResponse) JSON() []byte {
 	j, _ := json.Marshal(r)
 	return j
+}
+
+type ShowFeedRequest struct {
+	ID uuid.UUID `uri:"id"`
+}
+
+type ShowFeedResponse struct {
+	helper.GenericResponse
+	Detail model.FeedWithComments `json:"detail"`
 }
 
 type HideRequest struct {
@@ -35,10 +44,10 @@ type HideResponse struct {
 }
 
 type NewFeedRequest struct {
-	Title string `json:"title"`
-	URL   string `json:"url"`
-	Text  string `json:"text"`
-	Type  string `json:"type"`
+	Title string `json:"title,omitempty"`
+	URL   string `json:"url,omitempty"`
+	Text  string `json:"text,omitempty"`
+	Type  string `json:"type,omitempty"`
 }
 
 type NewFeedResponse struct {

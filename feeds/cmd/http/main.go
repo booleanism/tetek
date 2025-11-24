@@ -54,19 +54,19 @@ func main() {
 
 	baseCtx := context.Background()
 
-	acc := contracts.SubscribeAccount(mqCon)
-	accLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
-	if err := acc.AccountResListener(accLisCtx, ServiceName); err != nil {
-		panic(err)
-	}
-
 	authContr := contracts.SubsribeAuth(mqCon)
 	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
 		panic(err)
 	}
 
-	rec := recipes.NewRecipes(repo, acc)
+	commContr := contracts.SubscribeComments(mqCon)
+	commLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := commContr.CommentsResListener(commLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
+
+	rec := recipes.NewRecipes(repo, commContr)
 
 	feedsContr := contract.NewFeeds(mqCon, repo)
 	if _, err := feedsContr.WorkerFeedsListener(); err != nil {
@@ -96,7 +96,8 @@ func main() {
 			return ctx.SendString(ui)
 		})
 
-		apiEp.Get("/", middlewares.Auth(authContr), router.GetFeeds).Name("getFeeds-handler")
+		apiEp.Get("/", middlewares.OptionalAuth(authContr), router.GetFeeds).Name("getFeeds-handler")
+		apiEp.Get("/:id", middlewares.OptionalAuth(authContr), router.ShowFeed).Name("showFeed-handler")
 		apiEp.Post("/", middlewares.Auth(authContr), router.NewFeed).Name("newFeed-handler")
 		apiEp.Delete("/:id", middlewares.Auth(authContr), router.DeleteFeed).Name("deleteFeed-handler")
 		apiEp.Patch("/hide", middlewares.Auth(authContr), router.HideFeed).Name("hideFeed-handler")

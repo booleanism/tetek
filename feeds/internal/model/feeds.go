@@ -3,18 +3,24 @@ package model
 import (
 	"time"
 
+	"github.com/booleanism/tetek/comments/amqp"
 	"github.com/google/uuid"
 )
 
 type Feed struct {
-	ID         uuid.UUID  `json:"id"`
-	Title      string     `json:"title"`
-	URL        string     `json:"url"`
-	Text       string     `json:"text"`
-	By         string     `json:"by"`
-	Type       string     `json:"type"`
-	Points     int        `json:"points"`
-	NCommnents int        `json:"n_comments"`
-	CreatedAt  *time.Time `json:"created_at"`
-	DeletedAt  *time.Time `json:"deleted_at"`
+	ID         uuid.UUID  `json:"id,omitempty"`
+	Title      string     `json:"title,omitempty"`
+	URL        string     `json:"url,omitempty"`
+	Text       string     `json:"text,omitempty"`
+	By         string     `json:"by,omitempty"`
+	Type       string     `json:"type,omitempty"`
+	Points     int        `json:"points,omitempty"`
+	NCommnents int        `json:"n_comments,omitempty"`
+	CreatedAt  *time.Time `json:"created_at,omitempty"`
+	DeletedAt  *time.Time `json:"deleted_at,omitempty"`
+}
+
+type FeedWithComments struct {
+	Feed
+	Comments []amqp.Comment `json:"comments"`
 }

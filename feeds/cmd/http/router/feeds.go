@@ -39,6 +39,7 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 		gRes.Code = errro.ErrAcqPool
 		gRes.Message = "failed to acquire pool"
 		e := errro.New(gRes.Code, gRes.Message)
+		log.Error(e, e.Msg())
 		return e.WithDetail(gRes.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusInternalServerError)
 	}
 	defer pools.FeedsPool.Put(fBuf)
@@ -48,10 +49,7 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 	if err == nil {
 		gRes.Code = errro.Success
 		gRes.Message = "fetch feeds success"
-		res := recipes.GetFeedsResponse{
-			GenericResponse: gRes,
-			Detail:          fBuf.Value,
-		}
+		res := recipes.GetFeedsResponse{GenericResponse: gRes, Details: fBuf.Value}
 		return ctx.Status(fiber.StatusOK).JSON(&res)
 	}
 
