@@ -28,7 +28,6 @@ func (r *userRepo) GetUser(ctx context.Context, user **model.User) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
 	c, err := r.pool.Acquire(ctx)
 	if err != nil {
-		log.Error(err, "failed to acquire db pool", "requestID", corrID)
 		return err
 	}
 	defer c.Release()
@@ -56,7 +55,6 @@ func (r *userRepo) NewUser(ctx context.Context, user **model.User) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
 	c, err := r.pool.Acquire(ctx)
 	if err != nil {
-		log.Error(err, "failed to acquire db pool", "requestID", corrID)
 		return err
 	}
 	defer c.Release()

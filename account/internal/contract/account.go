@@ -57,7 +57,7 @@ func (c *AccContr) WorkerAccountListener(ctx context.Context) (*amqp091.Channel,
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
 				log.V(1).Info("failed to marshal account task", "requestID", d.CorrelationId, "error", err, "body", d.Body)
-				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountParseFail, Message: "error parsing account task"})
+				res, _ := json.Marshal(&amqp.AccountResult{Code: errro.ErrAccountParseFail, Message: "error parsing account task"})
 				accountResultPublisher(log, task, ch, d, res, err)
 				continue
 			}
@@ -66,18 +66,18 @@ func (c *AccContr) WorkerAccountListener(ctx context.Context) (*amqp091.Channel,
 				u := &task.User
 				err := c.repo.GetUser(ctx, &u)
 				if err == nil {
-					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.Success, Message: "user found", Detail: *u})
+					res, _ := json.Marshal(&amqp.AccountResult{Code: errro.Success, Message: "user found", Detail: *u})
 					accountResultPublisher(log, task, ch, d, res, err)
 					continue
 				}
 
 				if err == pgx.ErrNoRows {
-					res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountNoUser, Message: "user not found", Detail: task.User})
+					res, _ := json.Marshal(&amqp.AccountResult{Code: errro.ErrAccountNoUser, Message: "user not found", Detail: task.User})
 					accountResultPublisher(log, task, ch, d, res, err)
 					continue
 				}
 
-				res, _ := json.Marshal(&amqp.AccountRes{Code: errro.ErrAccountDBError, Message: "something happen in our end", Detail: task.User})
+				res, _ := json.Marshal(&amqp.AccountResult{Code: errro.ErrAccountDBError, Message: "something happen in our end", Detail: task.User})
 				accountResultPublisher(log, task, ch, d, res, err)
 				continue
 			}

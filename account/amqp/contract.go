@@ -22,7 +22,7 @@ type AccountTask struct {
 	User
 }
 
-type AccountRes struct {
+type AccountResult struct {
 	Code    int    `json:"code"`
 	Message string `json:"message"`
 	Detail  User   `json:"account"`

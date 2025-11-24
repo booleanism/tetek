@@ -88,6 +88,8 @@ const (
 	ErrCommNoConsume     = ErrAccountNoUser
 	ErrCommDownvoteFail  = -16
 	ErrCommUpvoteFail    = -17
+	ErrCommParseFail     = ErrAccountParseFail
+	ErrCommNoComments    = ErrFeedsNoFeeds
 )
 
 type err struct {

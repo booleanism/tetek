@@ -7,31 +7,31 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/booleanism/tetek/account/amqp"
+	"github.com/booleanism/tetek/comments/amqp"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type AccountSubscribe interface {
-	Publish(context.Context, amqp.AccountTask) error
-	Consume(context.Context, **amqp.AccountResult) error
+type CommentsSubscribe interface {
+	Publish(context.Context, amqp.CommentsTask) error
+	Consume(context.Context, **amqp.CommentsResult) error
 }
 
-type localAccContr struct {
+type localCommContr struct {
 	con  *amqp091.Connection
-	res  map[string]chan *amqp.AccountResult
+	res  map[string]chan *amqp.CommentsResult
 	mRes sync.Mutex
 }
 
-func SubscribeAccount(con *amqp091.Connection) *localAccContr {
-	return &localAccContr{con: con, res: make(map[string]chan *amqp.AccountResult)}
+func SubscribeComments(con *amqp091.Connection) *localCommContr {
+	return &localCommContr{con: con, res: make(map[string]chan *amqp.CommentsResult)}
 }
 
-func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) error {
+func (c *localCommContr) Publish(ctx context.Context, task amqp.CommentsTask) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
-	_, log := loggr.GetLogger(ctx, "account-task-publisher")
+	_, log := loggr.GetLogger(ctx, "comments-task-publisher")
 
 	ch, err := c.con.Channel()
 	if err != nil {
@@ -45,32 +45,32 @@ func (c *localAccContr) Publish(ctx context.Context, task amqp.AccountTask) erro
 	}()
 
 	c.mRes.Lock()
-	c.res[corrID] = make(chan *amqp.AccountResult)
+	c.res[corrID] = make(chan *amqp.CommentsResult)
 	c.mRes.Unlock()
 
 	t, _ := json.Marshal(&task)
-	if err = ch.Publish(amqp.AccountExchange, amqp.AccountTaskRk, false, false, amqp091.Publishing{
+	if err = ch.Publish(amqp.CommentsExchange, amqp.CommentsTaskRk, false, false, amqp091.Publishing{
 		CorrelationId: corrID,
 		ContentType:   "text/json",
 		Body:          t,
 	}); err != nil {
-		log.Error(err, "failed to publish account task", "task", task)
+		log.Error(err, "failed to publish comments task", "task", task)
 		return err
 	}
 
 	return nil
 }
 
-func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountResult) error {
+func (c *localCommContr) Consume(ctx context.Context, res **amqp.CommentsResult) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
-	_, log := loggr.GetLogger(ctx, "account-task-publisher")
+	_, log := loggr.GetLogger(ctx, "comments-task-publisher")
 
 	c.mRes.Lock()
 	ch, ok := c.res[corrID]
 	c.mRes.Unlock()
 	if !ok {
-		e := errors.New("no account result with given correlation id")
-		log.V(1).Info("does not receive account result from chan", "error", e)
+		e := errors.New("no comments result with given correlation id")
+		log.V(1).Info("does not receive comments result from chan", "error", e)
 		return e
 	}
 
@@ -89,23 +89,23 @@ func (c *localAccContr) Consume(ctx context.Context, res **amqp.AccountResult) e
 	}
 }
 
-func (c *localAccContr) AccountResListener(ctx context.Context, name string) error {
-	_, log := loggr.GetLogger(ctx, "account-res-listener")
+func (c *localCommContr) CommentsResListener(ctx context.Context, name string) error {
+	_, log := loggr.GetLogger(ctx, "comments-res-listener")
 	ch, err := c.con.Channel()
 	if err != nil {
 		return err
 	}
 
-	if err := amqp.AccountSetup(ch); err != nil {
+	if err := amqp.CommentsSetup(ch); err != nil {
 		return err
 	}
 
-	q, err := ch.QueueDeclare(fmt.Sprintf("account_res_%s", name), true, false, false, false, nil)
+	q, err := ch.QueueDeclare(fmt.Sprintf("comments_res_%s", name), true, false, false, false, nil)
 	if err != nil {
 		return err
 	}
 
-	err = ch.QueueBind(q.Name, amqp.AccountResRk, amqp.AccountExchange, false, nil)
+	err = ch.QueueBind(q.Name, amqp.CommentsResRk, amqp.CommentsExchange, false, nil)
 	if err != nil {
 		return err
 	}
@@ -131,22 +131,22 @@ func (c *localAccContr) AccountResListener(ctx context.Context, name string) err
 				continue
 			}
 
-			res := amqp.AccountResult{}
+			res := amqp.CommentsResult{}
 			if err := json.Unmarshal(d.Body, &res); err != nil {
-				log.V(1).Info("failed to marshal account result", "requestID", d.CorrelationId, "body", d.Body)
-				helper.Nack(log, d, "failed to marshal account result", "requestID", d.CorrelationId, "body", d.Body)
+				log.V(1).Info("failed to marshal comments result", "requestID", d.CorrelationId, "body", d.Body)
+				helper.Nack(log, d, "failed to marshal comments result", "requestID", d.CorrelationId, "body", d.Body)
 				continue
 			}
 
 			select {
 			case respCh <- &res:
 				if err := d.Ack(false); err != nil {
-					log.Error(err, "failed to nack account result", "requestID", d.CorrelationId, "message", d)
+					log.Error(err, "failed to nack comments result", "requestID", d.CorrelationId, "message", d)
 					continue
 				}
 			default:
-				helper.Nack(log, d, "cannot sent account result into result chan", "requestID", d.CorrelationId, "result", res)
-				log.V(1).Info("cannot sent account result into result chan", "requestID", d.CorrelationId, "result", res)
+				helper.Nack(log, d, "cannot sent comments result into result chan", "requestID", d.CorrelationId, "result", res)
+				log.V(1).Info("cannot sent comments result into result chan", "requestID", d.CorrelationId, "result", res)
 				continue
 			}
 		}
