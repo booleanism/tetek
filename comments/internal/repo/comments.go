@@ -15,7 +15,6 @@ const LIMIT = 30
 type CommentsRepo interface {
 	GetComments(context.Context, CommentFilter, *[]model.Comment) (int, error)
 	NewComment(context.Context, **model.Comment) error
-	Upvote(context.Context, CommentFilter) error
 }
 
 type CommentFilter struct {
