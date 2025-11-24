@@ -1,21 +1,28 @@
 package main
 
 import (
+	"context"
 	"os"
 
 	"github.com/booleanism/tetek/comments/cmd/http/router"
+	"github.com/booleanism/tetek/comments/internal/contract"
 	"github.com/booleanism/tetek/comments/internal/repo"
 	"github.com/booleanism/tetek/comments/recipes"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
+	"github.com/booleanism/tetek/pkg/loggr"
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
 	"github.com/gofiber/fiber/v3"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/rs/zerolog"
 )
 
-const LogV = 3
+const (
+	ServiceName = "comments"
+	LogV        = 2
+)
 
 func main() {
 	zl := zerolog.New(os.Stderr)
@@ -44,11 +51,29 @@ func main() {
 		}
 	}()
 
-	feedsContr := contracts.SubscribeFeeds(mqCon, "comments")
-	authContr := contracts.SubsribeAuth(mqCon, "comments")
+	feedsContr := contracts.SubscribeFeeds(mqCon, ServiceName)
+
+	baseCtx := context.Background()
+
+	authContr := contracts.SubsribeAuth(mqCon)
+	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
+
 	repo := repo.NewCommRepo(dbPool)
 	rec := recipes.NewCommentRecipes(repo, feedsContr, authContr)
 	router := router.NewCommRouter(rec)
+
+	ch, err := contract.NewComments(mqCon, repo).WorkerCommentsListener()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := ch.Close(); err != nil {
+			panic(err)
+		}
+	}()
 
 	app := fiber.New()
 	apiEp := app.Group("/api/v0")
@@ -56,10 +81,9 @@ func main() {
 	apiEp.Use(middlewares.GenerateRequestID)
 	apiEp.Use(middlewares.Logger("comments-service", &zl))
 
-	apiEp.Get("/:id", middlewares.OptionalAuth(authContr), router.GetComments).Name("get-comments")
-	apiEp.Post("/", middlewares.Auth(authContr), router.NewComment).Name("new-comment")
-	apiEp.Patch("/upvote", middlewares.Auth(authContr), router.Upvote).Name("upvote-comments")
-	apiEp.Patch("/downvote", middlewares.Auth(authContr), router.Downvote).Name("downvote-comments")
+	{
+		apiEp.Post("/", middlewares.Auth(authContr), router.NewComment).Name("new-comment-handler")
+	}
 
 	if err := app.Listen(":8084"); err != nil {
 		panic(err)

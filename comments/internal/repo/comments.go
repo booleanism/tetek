@@ -34,12 +34,10 @@ func NewCommRepo(db db.Acquireable) commRepo {
 }
 
 func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]model.Comment) (int, error) {
-	ctx, log := loggr.GetLogger(ctx, "repo/get-comments")
+	ctx, log := loggr.GetLogger(ctx, "getComments-repo")
 	d, err := c.Acquire(ctx)
 	if err != nil {
-		e := errro.FromError(errro.ErrCommDBError, "failed to acquire db pool", err)
-		log.Error(err, e.Error())
-		return 0, e
+		return 0, err
 	}
 	defer d.Release()
 
@@ -91,12 +89,10 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 }
 
 func (c commRepo) NewComment(ctx context.Context, com **model.Comment) error {
-	ctx, log := loggr.GetLogger(ctx, "repo/new-comment")
+	ctx, log := loggr.GetLogger(ctx, "newComment-repo")
 	d, err := c.Acquire(ctx)
 	if err != nil {
-		e := errro.FromError(errro.ErrCommDBError, "failed to acquire db pool", err)
-		log.Error(err, e.Error())
-		return e
+		return err
 	}
 	defer d.Release()
 

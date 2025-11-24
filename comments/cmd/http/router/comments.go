@@ -18,31 +18,28 @@ func NewCommRouter(r recipes.CommentsRecipes) commRouter {
 	return commRouter{r}
 }
 
-func (cr commRouter) GetComments(ctx fiber.Ctx) error {
+func (cr commRouter) NewComment(ctx fiber.Ctx) error {
 	c, log := loggr.GetLogger(ctx.Context(), ctx.Route().Name)
-	log.Info("new get comments request")
+	log.V(1).Info("new new comment request")
 
 	gRes := helper.GenericResponse{}
-	req := recipes.GetCommentsRequest{}
+	req := recipes.NewCommentRequest{}
 	if err := helper.BindRequest(ctx, &req); err != nil {
-		log.V(1).Info(err.Error())
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	cto, cancel := context.WithTimeout(
-		c,
-		Timeout)
+	cto, cancel := context.WithTimeout(c, helper.Timeout)
 	defer cancel()
 
-	comms, err := cr.r.GetComments(cto, req)
-	if err == nil {
-		gRes.Code = errro.Success
-		gRes.Message = "success fetching comments"
-		res := recipes.GetCommentsResponse{GenericResponse: gRes, Details: comms}
-		return ctx.Status(fiber.StatusOK).JSON(&res)
+	com, err := cr.r.NewComment(cto, req)
+	if err != nil {
+		gRes.Code = err.Code()
+		gRes.Message = err.Error()
+		return ctx.Status(fiber.StatusInternalServerError).JSON(&gRes)
 	}
 
-	gRes.Code = err.Code()
-	gRes.Message = err.Error()
-	return ctx.Status(fiber.StatusInternalServerError).JSON(&gRes)
+	gRes.Code = errro.Success
+	gRes.Message = "success adding comment"
+	res := recipes.NewCommentResponse{GenericResponse: gRes, Detail: com}
+	return ctx.Status(fiber.StatusOK).JSON(&res)
 }
