@@ -37,6 +37,9 @@ build-feeds: .deps
 build-feeds-worker: .deps
 	docker build -t feeds-worker:${VERSION} -f feeds/worker.dockerfile .
 
+build-comms: .deps
+	docker build -t comments:${VERSION} -f comments/service.dockerfile .
+
 run-account: build-account
 	docker run --env-file .env --network=tetek6_accountnet --network=tetek6_brokernet --name account-service -it --rm -p 8082:8082 account:${VERSION} 
 
@@ -45,6 +48,9 @@ run-auth: build-auth
 
 run-feeds: build-feeds
 	docker run --env-file .env --network=tetek6_feedsnet --network=tetek6_brokernet --name feeds-service -it --rm -p 8083:8083 feeds:${VERSION} 
+
+run-comms: build-comms
+	docker run --env-file .env --network=tetek6_commentsnet --network=tetek6_brokernet --name comms-service -it --rm -p 8084:8084 comments:${VERSION} 
 
 run-account-worker: build-account-worker
 	docker run --env-file .env --network=tetek6_accountnet --network=tetek6_brokernet --name account-worker -it --rm -p 8082:8082 account-worker:${VERSION} 
