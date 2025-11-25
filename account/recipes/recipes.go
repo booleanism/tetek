@@ -21,8 +21,8 @@ func New(repo repo.UserRepo) recipes {
 	return recipes{repo}
 }
 
-func (r recipes) Profile(ctx context.Context, req ProfileRequest) (model.User, errro.Error) {
-	return (&profileRecipe{r.repo}).Profile(ctx, req)
+func (r recipes) Profile(ctx context.Context, req ProfileRequest, u **model.User) errro.Error {
+	return (&profileRecipe{r.repo}).Profile(ctx, req, u)
 }
 
 func (r recipes) Regist(ctx context.Context, req RegistRequest) errro.Error {

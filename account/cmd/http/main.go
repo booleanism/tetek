@@ -74,13 +74,15 @@ func main() {
 		}
 	}()
 
+	router := router.NewRouter(rec)
+
 	app := fiber.New()
 	api := app.Group("/api/v0")
 	{
 		api.Use(middlewares.GenerateRequestID)
 		api.Use(middlewares.Logger(ServiceName, &zl))
-		api.Post("/", router.Regist(rec)).Name("registration-handler")
-		api.Get("/:uname", middlewares.Auth(authContr), router.Profile(rec)).Name("profile-handler")
+		api.Post("/", router.Regist).Name("registration-handler")
+		api.Get("/:uname", middlewares.Auth(authContr), router.Profile).Name("profile-handler")
 	}
 
 	if err := app.Listen(":8082"); err != nil {
