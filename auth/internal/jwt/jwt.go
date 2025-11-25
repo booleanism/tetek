@@ -12,7 +12,7 @@ import (
 )
 
 type JwtRecipes interface {
-	Verify(context.Context, string) (*JwtClaims, error)
+	Verify(context.Context, string, **JwtClaims) error
 	Generate(amqp.User) (string, error)
 }
 
@@ -33,7 +33,7 @@ func NewJwt(secr []byte) *jwtRecipe {
 	return &jwtRecipe{secr}
 }
 
-func (r *jwtRecipe) Verify(ctx context.Context, j string) (*JwtClaims, error) {
+func (r *jwtRecipe) Verify(ctx context.Context, j string, claims **JwtClaims) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
 	_, log := loggr.GetLogger(ctx, "verifier")
 	token, err := jwt.ParseWithClaims(j, &JwtClaims{}, func(token *jwt.Token) (any, error) {
@@ -41,29 +41,31 @@ func (r *jwtRecipe) Verify(ctx context.Context, j string) (*JwtClaims, error) {
 	})
 	if err != nil {
 		log.V(2).Info("failed to parse JWT", "requestID", corrID, "error", err)
-		return nil, err
+		return err
 	}
 
 	c, ok := token.Claims.(*JwtClaims)
 	if !token.Valid || !ok {
 		e := errors.New("invalid claims")
 		log.V(2).Info("missmatch claims type", "requestID", corrID, "error", e, "claims", token.Claims)
-		return nil, e
+		return e
 	}
 
 	if c.Subject != "auth" {
 		e := errors.New("invalid subject claims")
 		log.V(2).Info("expected auth subject", "requestID", corrID, "error", e, "subject", c.Subject)
-		return nil, e
+		return e
 	}
 
 	if time.Now().After(c.ExpiresAt.Time) {
 		e := errors.New("token expired")
 		log.V(2).Info("expiration time exceeded", "requestID", corrID, "error", e, "exp", token.Claims, "now", time.Now())
-		return nil, e
+		return e
 	}
 
-	return c, nil
+	(*claims) = c
+
+	return nil
 }
 
 func (r *jwtRecipe) Generate(user amqp.User) (string, error) {

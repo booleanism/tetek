@@ -61,7 +61,8 @@ func (c *AuthContr) WorkerAuthListener(ctx context.Context) (*amqp091.Channel, e
 				continue
 			}
 
-			claim, err := c.jwt.Verify(ctx, task.Jwt)
+			claim := &jwt.JwtClaims{}
+			err = c.jwt.Verify(ctx, task.Jwt, &claim)
 			if err != nil {
 				res, _ := json.Marshal(amqp.AuthResult{Code: errro.ErrAuthJWTVerifyFail, AuthTask: task})
 				authResultPublisher(log, task, ch, d, res, err)
