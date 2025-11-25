@@ -61,8 +61,8 @@ func setupUser(log logr.Logger, user **model.User) errro.Error {
 	}
 
 	id := (*user).ID
-	if id == "" {
-		id = uuid.NewString()
+	if id.String() == "00000000-0000-0000-0000-000000000000" {
+		id = uuid.New()
 	}
 
 	role := (*user).Role
