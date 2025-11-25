@@ -68,10 +68,10 @@ func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter, feedsBuf *[]model
 	}
 
 	order := "f.points DESC"
-	if ff.Order == 1 {
+	if ff.Order == 0 {
 		order = "f.created_at ASC"
 	}
-	if ff.Order == 2 {
+	if ff.Order == 1 {
 		order = "f.created_at DESC"
 	}
 
@@ -171,6 +171,26 @@ func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter, feed **model
 	).Scan(&(*feed).DeletedAt)
 	if err != nil {
 		log.Error(err, "failed to update feed state into deleted feed", "filter", ff)
+	}
+
+	return err
+}
+
+func (r *feedsRepo) HideFeed(ctx context.Context, hf **model.HiddenFeed) error {
+	ctx, log := loggr.GetLogger(ctx, "hideFeed-repo")
+	q, err := r.pool.Acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer q.Release()
+
+	err = q.QueryRow(
+		ctx,
+		"INSERT INTO hiddenfeeds (id, to_uname, feed) VALUES ($1, $2, $3) ON CONFLICT (to_uname, feed) DO UPDATE SET feed = EXCLUDED.feed RETURNING id, to_uname, feed",
+		&(*hf).ID, &(*hf).To, &(*hf).FeedID,
+	).Scan(&(*hf).ID, &(*hf).To, &(*hf).FeedID)
+	if err != nil {
+		log.Error(err, "failed to set feeds state into hiddenfeeds")
 	}
 
 	return err

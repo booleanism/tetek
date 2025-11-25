@@ -151,7 +151,7 @@ func (fr feedRecipes) Hide(ctx context.Context, req HideRequest) errro.Error {
 	defer hfBuf.Reset()
 
 	hf := &hfBuf.Value[0]
-	hf.ID = uuid.NewString()
+	hf.ID = uuid.New()
 	hf.To = jwt.Claims.Uname
 	hf.FeedID = req.ID
 
