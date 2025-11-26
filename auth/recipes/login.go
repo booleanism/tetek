@@ -36,7 +36,7 @@ func (r *loginRecipe) Login(ctx context.Context, req LoginRequest) (string, errr
 
 	res := &amqp.AccountResult{}
 	task := amqp.AccountTask{Cmd: 0, User: *user}
-	if err := r.accAdapter(ctx, task, &res); err != nil {
+	if err := contracts.AccAdapter(ctx, r.l, task, &res); err != nil {
 		return "", err
 	}
 
@@ -65,20 +65,6 @@ func (r *loginRecipe) Login(ctx context.Context, req LoginRequest) (string, errr
 	e := errro.New(errro.ErrAuthFailRetrieveUser, "failed to retrieve user information")
 	log.V(2).Info(e.Msg(), "user", user)
 	return "", e
-}
-
-func (r *loginRecipe) accAdapter(ctx context.Context, task amqp.AccountTask, res **amqp.AccountResult) errro.Error {
-	if err := r.l.Publish(ctx, task); err != nil {
-		e := errro.FromError(errro.ErrAccountServiceUnavailable, "failed to publish account task", err)
-		return e
-	}
-
-	err := r.l.Consume(ctx, res)
-	if err != nil {
-		e := errro.FromError(errro.ErrAccountServiceUnavailable, "failed consuming account result", err)
-		return e
-	}
-	return nil
 }
 
 func checkLoginProperty(log logr.Logger, user **amqp.User) errro.Error {
