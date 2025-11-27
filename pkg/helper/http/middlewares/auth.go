@@ -18,7 +18,7 @@ type authRequest struct {
 	Authorization string `header:"Authorization"`
 }
 
-func OptionalAuth(auth contracts.AuthSubscribe) fiber.Handler {
+func OptionalAuth(auth contracts.AuthDealer) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		jwt, er := checkJwt(ctx)
 		if er != nil {
@@ -83,7 +83,7 @@ func checkJwt(ctx fiber.Ctx) (string, errro.Error) {
 	return jwt, nil
 }
 
-func Auth(auth contracts.AuthSubscribe) fiber.Handler {
+func Auth(auth contracts.AuthDealer) fiber.Handler {
 	return func(ctx fiber.Ctx) error {
 		jwt, er := checkJwt(ctx)
 		res := helper.GenericResponse{}
@@ -120,7 +120,7 @@ func Auth(auth contracts.AuthSubscribe) fiber.Handler {
 	}
 }
 
-func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amqp.AuthResult) errro.ResError {
+func actualAuth(ctx context.Context, auth contracts.AuthDealer, authRes **amqp.AuthResult) errro.ResError {
 	authTask, ok := ctx.Value(keystore.AuthTask{}).(*amqp.AuthTask)
 	res := helper.GenericResponse{}
 	if !ok {
@@ -147,7 +147,7 @@ func actualAuth(ctx context.Context, auth contracts.AuthSubscribe, authRes **amq
 	return e.WithDetail(res.JSON(), errro.TDetailJSON)
 }
 
-func authAdapter(ctx context.Context, auth contracts.AuthSubscribe, t amqp.AuthTask, res **amqp.AuthResult) errro.Error {
+func authAdapter(ctx context.Context, auth contracts.AuthDealer, t amqp.AuthTask, res **amqp.AuthResult) errro.Error {
 	if err := auth.Publish(ctx, t); err != nil {
 		e := errro.FromError(errro.ErrCommPubFail, "failed to publish auth task", err)
 		return e

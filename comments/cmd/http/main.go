@@ -51,11 +51,15 @@ func main() {
 		}
 	}()
 
-	feedsContr := contracts.SubscribeFeeds(mqCon, ServiceName)
-
 	baseCtx := context.Background()
 
-	authContr := contracts.SubsribeAuth(mqCon)
+	feedsContr := contracts.FeedsAssent(mqCon)
+	feedsLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if err := feedsContr.FeedsResListener(feedsLisCtx, ServiceName); err != nil {
+		panic(err)
+	}
+
+	authContr := contracts.AuthAssent(mqCon)
 	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
 		panic(err)

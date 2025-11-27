@@ -54,13 +54,13 @@ func main() {
 
 	baseCtx := context.Background()
 
-	authContr := contracts.SubsribeAuth(mqCon)
+	authContr := contracts.AuthAssent(mqCon)
 	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
 		panic(err)
 	}
 
-	commContr := contracts.SubscribeComments(mqCon)
+	commContr := contracts.CommentsAssent(mqCon)
 	commLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if err := commContr.CommentsResListener(commLisCtx, ServiceName); err != nil {
 		panic(err)

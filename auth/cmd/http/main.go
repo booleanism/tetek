@@ -63,7 +63,7 @@ func main() {
 		}
 	}()
 
-	accContr := contracts.SubscribeAccount(mqCon)
+	accContr := contracts.AccountAssent(mqCon)
 
 	accLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if err := accContr.AccountResListener(accLisCtx, ServiceName); err != nil {

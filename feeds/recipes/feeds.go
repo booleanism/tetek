@@ -28,10 +28,10 @@ type FeedRecipes interface {
 
 type feedRecipes struct {
 	repo      repo.FeedsRepo
-	commContr contracts.CommentsSubscribe
+	commContr contracts.CommentsDealer
 }
 
-func NewRecipes(repo repo.FeedsRepo, commContr contracts.CommentsSubscribe) feedRecipes {
+func NewRecipes(repo repo.FeedsRepo, commContr contracts.CommentsDealer) feedRecipes {
 	return feedRecipes{repo, commContr}
 }
 

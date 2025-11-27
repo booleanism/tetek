@@ -19,11 +19,11 @@ type CommentsRecipes interface {
 
 type commRecipes struct {
 	repo  repo.CommentsRepo
-	feeds contracts.FeedsSubsribe
-	auth  contracts.AuthSubscribe
+	feeds contracts.FeedsDealer
+	auth  contracts.AuthDealer
 }
 
-func NewCommentRecipes(repo repo.CommentsRepo, feedsContr contracts.FeedsSubsribe, authContr contracts.AuthSubscribe) commRecipes {
+func NewCommentRecipes(repo repo.CommentsRepo, feedsContr contracts.FeedsDealer, authContr contracts.AuthDealer) commRecipes {
 	return commRecipes{repo, feedsContr, authContr}
 }
 

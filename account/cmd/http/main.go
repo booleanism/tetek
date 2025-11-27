@@ -53,7 +53,7 @@ func main() {
 
 	baseCtx := context.Background()
 
-	authContr := contracts.SubsribeAuth(mqCon)
+	authContr := contracts.AuthAssent(mqCon)
 	authLisCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if err := authContr.AuthResListener(authLisCtx, ServiceName); err != nil {
 		panic(err)

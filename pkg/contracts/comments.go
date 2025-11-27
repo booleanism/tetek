@@ -2,155 +2,44 @@ package contracts
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
-	"sync"
 
 	"github.com/booleanism/tetek/comments/amqp"
-	"github.com/booleanism/tetek/pkg/helper"
-	"github.com/booleanism/tetek/pkg/keystore"
-	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type CommentsSubscribe interface {
-	Publish(context.Context, amqp.CommentsTask) error
-	Consume(context.Context, **amqp.CommentsResult) error
+type CommentsDealer interface {
+	Dealer
 }
 
 type localCommContr struct {
-	con  *amqp091.Connection
-	res  map[string]chan *amqp.CommentsResult
-	mRes sync.Mutex
+	d DealContract[amqp.CommentsTask, amqp.CommentsResult]
 }
 
-func SubscribeComments(con *amqp091.Connection) *localCommContr {
-	return &localCommContr{con: con, res: make(map[string]chan *amqp.CommentsResult)}
+func CommentsAssent(con *amqp091.Connection) *localCommContr {
+	return &localCommContr{
+		d: DealContract[amqp.CommentsTask, amqp.CommentsResult]{
+			con:      con,
+			name:     "comments",
+			exchange: amqp.CommentsExchange,
+			trk:      amqp.CommentsTaskRk,
+			rrk:      amqp.CommentsResRk,
+			res:      make(map[string]chan *amqp.CommentsResult),
+		},
+	}
 }
 
-func (c *localCommContr) Publish(ctx context.Context, task amqp.CommentsTask) error {
-	corrID := ctx.Value(keystore.RequestID{}).(string)
-	_, log := loggr.GetLogger(ctx, "comments-task-publisher")
-
-	ch, err := c.con.Channel()
-	if err != nil {
-		log.Error(err, "failed to open channel")
-		return err
-	}
-	defer func() {
-		if err := ch.Close(); err != nil {
-			log.Error(err, "failed to close channel")
-		}
-	}()
-
-	c.mRes.Lock()
-	c.res[corrID] = make(chan *amqp.CommentsResult)
-	c.mRes.Unlock()
-
-	t, _ := json.Marshal(&task)
-	if err = ch.Publish(amqp.CommentsExchange, amqp.CommentsTaskRk, false, false, amqp091.Publishing{
-		CorrelationId: corrID,
-		ContentType:   "text/json",
-		Body:          t,
-	}); err != nil {
-		log.Error(err, "failed to publish comments task", "task", task)
-		return err
-	}
-
-	return nil
+func (c *localCommContr) Publish(ctx context.Context, task any) error {
+	return c.d.Publish(ctx, task)
 }
 
-func (c *localCommContr) Consume(ctx context.Context, res **amqp.CommentsResult) error {
-	corrID := ctx.Value(keystore.RequestID{}).(string)
-	_, log := loggr.GetLogger(ctx, "comments-task-publisher")
-
-	c.mRes.Lock()
-	ch, ok := c.res[corrID]
-	c.mRes.Unlock()
-	if !ok {
-		e := errors.New("no comments result with given correlation id")
-		log.V(1).Info("does not receive comments result from chan", "error", e)
-		return e
-	}
-
-	select {
-	case <-ctx.Done():
-		e := errors.New("deadline exceeded")
-		log.V(1).Info("receive ctx.Done", "error", e)
-		return e
-	case *res = <-ch:
-		c.mRes.Lock()
-		delete(c.res, corrID)
-		close(ch)
-		c.mRes.Unlock()
-
-		return nil
-	}
+func (c *localCommContr) Consume(ctx context.Context, res any) error {
+	return c.d.Consume(ctx, res)
 }
 
 func (c *localCommContr) CommentsResListener(ctx context.Context, name string) error {
-	_, log := loggr.GetLogger(ctx, "comments-res-listener")
-	ch, err := c.con.Channel()
-	if err != nil {
-		return err
-	}
+	return c.d.resListener(ctx, name, amqp.CommentsSetup)
+}
 
-	if err := amqp.CommentsSetup(ch); err != nil {
-		return err
-	}
-
-	q, err := ch.QueueDeclare(fmt.Sprintf("comments_res_%s", name), true, false, false, false, nil)
-	if err != nil {
-		return err
-	}
-
-	err = ch.QueueBind(q.Name, amqp.CommentsResRk, amqp.CommentsExchange, false, nil)
-	if err != nil {
-		return err
-	}
-
-	mgs, err := ch.Consume(q.Name, "", false, false, false, false, nil)
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		for d := range mgs {
-			if d.ContentType != "text/json" {
-				log.V(1).Info("unexpected ContentType", "requestID", d.CorrelationId, "ContentType", d.ContentType)
-				helper.Nack(log, d, "unexpected ContentType")
-				continue
-			}
-
-			c.mRes.Lock()
-			respCh, ok := c.res[d.CorrelationId]
-			c.mRes.Unlock()
-			if !ok {
-				helper.Nack(log, d, "requestID", d.CorrelationId, "res", c.res)
-				continue
-			}
-
-			res := amqp.CommentsResult{}
-			if err := json.Unmarshal(d.Body, &res); err != nil {
-				log.V(1).Info("failed to marshal comments result", "requestID", d.CorrelationId, "body", d.Body)
-				helper.Nack(log, d, "failed to marshal comments result", "requestID", d.CorrelationId, "body", d.Body)
-				continue
-			}
-
-			select {
-			case respCh <- &res:
-				if err := d.Ack(false); err != nil {
-					log.Error(err, "failed to nack comments result", "requestID", d.CorrelationId, "message", d)
-					continue
-				}
-			default:
-				helper.Nack(log, d, "cannot sent comments result into result chan", "requestID", d.CorrelationId, "result", res)
-				log.V(1).Info("cannot sent comments result into result chan", "requestID", d.CorrelationId, "result", res)
-				continue
-			}
-		}
-	}()
-
-	return nil
+func (c *localCommContr) Name() string {
+	return c.d.name
 }

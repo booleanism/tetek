@@ -17,11 +17,11 @@ type LoginRecipe interface {
 }
 
 type loginRecipe struct {
-	l   contracts.AccountSubscribe
+	l   contracts.AccountDealer
 	jwt jwt.JwtRecipes
 }
 
-func NewLogin(contr contracts.AccountSubscribe, jwt jwt.JwtRecipes) *loginRecipe {
+func NewLogin(contr contracts.AccountDealer, jwt jwt.JwtRecipes) *loginRecipe {
 	return &loginRecipe{contr, jwt}
 }
 
