@@ -130,7 +130,7 @@ func actualAuth(ctx context.Context, auth contracts.AuthDealer, authRes **amqp.A
 		return e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
-	if err := authAdapter(ctx, auth, *authTask, authRes); err != nil {
+	if err := contracts.AuthAdapter(ctx, auth, *authTask, authRes); err != nil {
 		res.Code = errro.ErrServiceUnavailable
 		res.Message = "auth service unavailable: publishing auth task"
 		e := errro.New(res.Code, res.Message)
@@ -145,18 +145,4 @@ func actualAuth(ctx context.Context, auth contracts.AuthDealer, authRes **amqp.A
 	res.Message = "authorization failed"
 	e := errro.New(res.Code, res.Message)
 	return e.WithDetail(res.JSON(), errro.TDetailJSON)
-}
-
-func authAdapter(ctx context.Context, auth contracts.AuthDealer, t amqp.AuthTask, res **amqp.AuthResult) errro.Error {
-	if err := auth.Publish(ctx, t); err != nil {
-		e := errro.FromError(errro.ErrCommPubFail, "failed to publish auth task", err)
-		return e
-	}
-
-	err := auth.Consume(ctx, res)
-	if err != nil {
-		e := errro.FromError(errro.ErrCommConsumeFail, "failed to consume auth result", err)
-		return e
-	}
-	return nil
 }

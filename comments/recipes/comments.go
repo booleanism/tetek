@@ -37,7 +37,7 @@ func (cr commRecipes) NewComment(ctx context.Context, req NewCommentRequest) (mo
 	// assume the head is feeds, then find it on feeds service
 	t := amqpFeeds.FeedsTask{Cmd: 0, Feeds: amqpFeeds.Feeds{ID: req.Head}}
 	feedsRes := &amqpFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
-	err := cr.feedsAdapter(ctx, t, &feedsRes)
+	err := contracts.FeedsAdapter(ctx, cr.feeds, t, &feedsRes)
 	if err != nil {
 		return model.Comment{}, err
 	}

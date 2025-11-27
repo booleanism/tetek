@@ -6,6 +6,8 @@ import (
 
 	mqAcc "github.com/booleanism/tetek/account/amqp"
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
+	mqComm "github.com/booleanism/tetek/comments/amqp"
+	mqFeeds "github.com/booleanism/tetek/feeds/amqp"
 	"github.com/booleanism/tetek/pkg/errro"
 )
 
@@ -17,11 +19,11 @@ func AuthAdapter(ctx context.Context, auth AuthDealer, task mqAuth.AuthTask, res
 	return adapter(ctx, auth, task, res)
 }
 
-func FeedsAdapter(ctx context.Context, feeds FeedsDealer, task mqAuth.AuthTask, res **mqAuth.AuthResult) errro.Error {
+func FeedsAdapter(ctx context.Context, feeds FeedsDealer, task mqFeeds.FeedsTask, res **mqFeeds.FeedsResult) errro.Error {
 	return adapter(ctx, feeds, task, res)
 }
 
-func CommentsAdapter(ctx context.Context, comms FeedsDealer, task mqAuth.AuthTask, res **mqAuth.AuthResult) errro.Error {
+func CommentsAdapter(ctx context.Context, comms CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error {
 	return adapter(ctx, comms, task, res)
 }
 
