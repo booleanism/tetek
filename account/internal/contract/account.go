@@ -3,6 +3,7 @@ package contract
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/booleanism/tetek/account/amqp"
 	"github.com/booleanism/tetek/account/internal/repo"
@@ -81,6 +82,9 @@ func (c *AccContr) WorkerAccountListener(ctx context.Context) (*amqp091.Channel,
 				accountResultPublisher(log, task, ch, d, res, err)
 				continue
 			}
+
+			res, _ := json.Marshal(&amqp.AccountResult{Code: errro.ErrCommUnknownCmd, Message: "unknown command"})
+			accountResultPublisher(log, task, ch, d, res, fmt.Errorf("unexpected command"))
 		}
 	}()
 

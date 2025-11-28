@@ -44,6 +44,7 @@ const (
 	ErrAccountUserAlreadyExist   = 7
 	ErrAccountRegistFail         = 8
 	ErrAccountInvalidRegistParam = ErrAuthInvalidLoginParam
+	ErrAccountUnknownCmd         = ErrCommUnknownCmd
 )
 
 const (
