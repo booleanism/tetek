@@ -69,7 +69,8 @@ func main() {
 	rec := recipes.NewCommentRecipes(repo, feedsContr, authContr)
 	router := router.NewCommRouter(rec)
 
-	ch, err := contract.NewComments(mqCon, repo).WorkerCommentsListener()
+	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	ch, err := contract.NewComments(mqCon, repo).WorkerCommentsListener(workerCtx)
 	if err != nil {
 		panic(err)
 	}

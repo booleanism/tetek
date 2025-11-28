@@ -8,6 +8,7 @@ import (
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 const LIMIT = 30
@@ -84,6 +85,12 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 		log.Error(err, e.Error(), "rows", n)
 		return 0, e
 	}
+
+	if n == 0 {
+		log.V(1).Info("zero row comments", "filter", ff)
+		return 0, pgx.ErrNoRows
+	}
+
 	return n, nil
 }
 

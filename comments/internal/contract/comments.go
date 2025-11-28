@@ -8,6 +8,7 @@ import (
 	"github.com/booleanism/tetek/comments/internal/pools"
 	"github.com/booleanism/tetek/comments/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
+	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/jackc/pgx/v5"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -21,7 +22,7 @@ func NewComments(con *amqp091.Connection, repo repo.CommentsRepo) *CommentsContr
 	return &CommentsContr{con, repo}
 }
 
-func (c *CommentsContr) WorkerCommentsListener() (*amqp091.Channel, error) {
+func (c *CommentsContr) WorkerCommentsListener(ctx context.Context) (*amqp091.Channel, error) {
 	ch, err := c.con.Channel()
 	if err != nil {
 		return nil, err
@@ -39,6 +40,7 @@ func (c *CommentsContr) WorkerCommentsListener() (*amqp091.Channel, error) {
 
 	go func() {
 		for d := range mgs {
+			ctx = context.WithValue(ctx, keystore.RequestID{}, d.CorrelationId)
 			if d.ContentType != "text/json" {
 				continue
 			}
@@ -74,8 +76,8 @@ func (c *CommentsContr) WorkerCommentsListener() (*amqp091.Channel, error) {
 					defer pools.CommentsPool.Put(fBuf)
 					defer fBuf.Reset()
 
-					n, err := c.repo.GetComments(context.Background(), cf, &fBuf.Value)
-					if err == nil || n != 0 {
+					n, err := c.repo.GetComments(ctx, cf, &fBuf.Value)
+					if err == nil && n != 0 {
 						res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.Success, Message: "comments found", Details: fBuf.Value[0:n]})
 						if err := ch.Publish(amqp.CommentsExchange, amqp.CommentsResRk, false, false, amqp091.Publishing{
 							CorrelationId: d.CorrelationId,
