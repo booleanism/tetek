@@ -86,8 +86,8 @@ const (
 	ErrCommPubFail       = -11
 	ErrCommConsumeFail   = -12
 	ErrCommNoConsume     = ErrAccountNoUser
-	ErrCommDownvoteFail  = -16
-	ErrCommUpvoteFail    = -17
+	ErrCommAcquirePool   = -16
+	ErrCommUnknownCmd    = 20
 	ErrCommParseFail     = ErrAccountParseFail
 	ErrCommNoComments    = ErrFeedsNoFeeds
 )
