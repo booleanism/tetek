@@ -133,6 +133,12 @@ func TestWorker(t *testing.T) {
 		},
 		{
 			AccountTask: amqp.AccountTask{
+				Cmd: 1, User: amqp.User{Uname: "root"},
+			},
+			expected: errro.ErrAccountUnknownCmd,
+		},
+		{
+			AccountTask: amqp.AccountTask{
 				Cmd: 0, User: amqp.User{Uname: "nouser"},
 			},
 			expected: errro.ErrAccountNoUser,
