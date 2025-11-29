@@ -94,8 +94,7 @@ type testData struct {
 }
 
 func TestWorker(t *testing.T) {
-	db.Register(container.dbConStr)
-	p := db.GetPool()
+	p := db.Register(container.dbConStr)
 	defer p.Close()
 
 	mqCon, err := amqp091.Dial(container.mqConStr)

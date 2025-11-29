@@ -60,9 +60,6 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-	db.Register(pgContainer.ConnectionString)
-	p := db.GetPool()
-	defer p.Close()
 	m.Run()
 	if err := postgresContainer.Terminate(*pgContainer, context.Background()); err != nil {
 		panic(err)
@@ -100,7 +97,8 @@ func (e dberr) Err() error {
 }
 
 func TestGetFeeds(t *testing.T) {
-	p := db.GetPool()
+	p := db.Register(pgContainer.ConnectionString)
+	defer p.Close()
 	data := []repoData{
 		{Feed: []model.Feed{}, ff: repo.FeedsFilter{}, expected: dberr{nil, ""}},
 		{Feed: []model.Feed{}, ff: repo.FeedsFilter{Type: "M"}, expected: dberr{nil, ""}},
@@ -135,7 +133,8 @@ func TestGetFeeds(t *testing.T) {
 }
 
 func TestNewFeeds(t *testing.T) {
-	p := db.GetPool()
+	p := db.Register(pgContainer.ConnectionString)
+	defer p.Close()
 	idExist, err := uuid.Parse("cdff23df-b62c-446d-a2c1-b759fa342c5c")
 	if err != nil {
 		t.FailNow()
@@ -172,7 +171,8 @@ func TestNewFeeds(t *testing.T) {
 }
 
 func TestDeleteFeeds(t *testing.T) {
-	p := db.GetPool()
+	p := db.Register(pgContainer.ConnectionString)
+	defer p.Close()
 	idExist, err := uuid.Parse("cdff23df-b62c-446d-a2c1-b759fa342c5c")
 	if err != nil {
 		t.FailNow()
@@ -207,7 +207,8 @@ func TestDeleteFeeds(t *testing.T) {
 }
 
 func TestHideFeeds(t *testing.T) {
-	p := db.GetPool()
+	p := db.Register(pgContainer.ConnectionString)
+	defer p.Close()
 	idExist, err := uuid.Parse("cdff23df-b62c-446d-a2c1-b759fa342c5c")
 	if err != nil {
 		t.FailNow()

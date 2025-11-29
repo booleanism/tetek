@@ -98,12 +98,10 @@ func TestWorker(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	db.Register(container.dbConStr)
-	pool := db.GetPool()
-	p := &pool
-	defer (*p).Close()
+	p := db.Register(container.dbConStr)
+	defer p.Close()
 
-	repo := repo.NewUserRepo(*p)
+	repo := repo.NewUserRepo(p)
 
 	acc := contract.NewAccount(con, repo)
 	ch, err := acc.WorkerAccountListener(context.Background())

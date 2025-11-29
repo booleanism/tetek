@@ -60,9 +60,6 @@ func init() {
 }
 
 func TestMain(m *testing.M) {
-	db.Register(pgContainer.ConnectionString)
-	p := db.GetPool()
-	defer p.Close()
 	m.Run()
 	if err := postgresContainer.Terminate(*pgContainer, context.Background()); err != nil {
 		panic(err)
@@ -98,7 +95,8 @@ func (e dberr) Err() error {
 }
 
 func TestGetUser(t *testing.T) {
-	p := db.GetPool()
+	p := db.Register(pgContainer.ConnectionString)
+	defer p.Close()
 	repo := repo.NewUserRepo(p)
 	data := []repoData{
 		{User: &model.User{Uname: "root"}, expected: dberr{}},
@@ -122,7 +120,8 @@ func TestGetUser(t *testing.T) {
 }
 
 func TestNewUser(t *testing.T) {
-	p := db.GetPool()
+	p := db.Register(pgContainer.ConnectionString)
+	defer p.Close()
 	repo := repo.NewUserRepo(p)
 	now := time.Now()
 	data := []repoData{
