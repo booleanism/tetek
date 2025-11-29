@@ -23,8 +23,7 @@ func main() {
 	if dbStr == "" {
 		panic("database connection string empty")
 	}
-	db.Register(dbStr)
-	dbPool := db.GetPool()
+	dbPool := db.Register(dbStr)
 	defer dbPool.Close()
 
 	mqStr := os.Getenv("BROKER_STR")

@@ -35,8 +35,7 @@ func main() {
 	if dbStr == "" {
 		panic("feeds database string empty")
 	}
-	db.Register(dbStr)
-	dbPool := db.GetPool()
+	dbPool := db.Register(dbStr)
 	defer dbPool.Close()
 
 	mqStr := os.Getenv("BROKER_STR")

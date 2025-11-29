@@ -18,9 +18,7 @@ type pool struct {
 	*pgxpool.Pool
 }
 
-var pl *pool
-
-func Register(cs string) {
+func Register(cs string) *pool {
 	p, err := pgxpool.New(context.Background(), cs)
 	if err != nil {
 		panic(err)
@@ -31,7 +29,7 @@ func Register(cs string) {
 		panic(err)
 	}
 
-	pl = &pool{p}
+	return &pool{p}
 }
 
 func (p *pool) Acquire(ctx context.Context) (*pgxpool.Conn, error) {
@@ -44,12 +42,4 @@ func (p *pool) Acquire(ctx context.Context) (*pgxpool.Conn, error) {
 		return nil, e
 	}
 	return pl, nil
-}
-
-func GetPool() Acquireable {
-	if pl == nil {
-		panic("Poor pool, not initialized. Consider calling `Register` first.")
-	}
-
-	return pl
 }

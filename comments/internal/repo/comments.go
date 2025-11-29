@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const LIMIT = 30
+const Limit = 30
 
 type CommentsRepo interface {
 	GetComments(context.Context, CommentFilter, *[]model.Comment) (int, error)
@@ -26,7 +26,7 @@ type CommentFilter struct {
 }
 
 type commRepo struct {
-	db.Acquireable
+	db db.Acquireable
 }
 
 func NewCommRepo(db db.Acquireable) commRepo {
@@ -35,7 +35,7 @@ func NewCommRepo(db db.Acquireable) commRepo {
 
 func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]model.Comment) (int, error) {
 	ctx, log := loggr.GetLogger(ctx, "getComments-repo")
-	d, err := c.Acquire(ctx)
+	d, err := c.db.Acquire(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -52,24 +52,21 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 			JOIN flat_comments ct 
 				ON ct.id = c.parent
 	)
-	SELECT c.id, c.parent, c.text, c.by, COUNT(p.comments_id) AS points, c.created_at
+	SELECT c.id, c.parent, c.text, c.by, c.created_at
 		FROM flat_comments c 
-		LEFT JOIN points p 
-			ON c.id = p.comments_id 
-		GROUP BY c.id, c.parent, c.text, c.by, c.created_at
 	LIMIT $2 OFFSET $3;`
 
-	rws, err := d.Query(ctx, q, ff.Head, LIMIT, ff.Offset)
+	rws, err := d.Query(ctx, q, ff.Head, Limit, ff.Offset)
 	if err != nil {
 		e := errro.FromError(errro.ErrCommQueryError, "failed execute query", err)
-		log.Error(err, e.Error(), q, "$1", ff.Head, "$2", LIMIT, "$3", ff.Offset)
+		log.Error(err, e.Error(), q, "$1", ff.Head, "$2", Limit, "$3", ff.Offset)
 		return 0, e
 	}
 
 	n := 0
 	for rws.Next() {
 		c := model.Comment{}
-		err := rws.Scan(&c.ID, &c.Parent, &c.Text, &c.By, &c.Points, &c.CreatedAt)
+		err := rws.Scan(&c.ID, &c.Parent, &c.Text, &c.By, &c.CreatedAt)
 		if err != nil {
 			e := errro.FromError(errro.ErrCommScanError, "error while scanning partial rows", err)
 			log.Error(err, e.Error(), "row-index", n)
@@ -96,7 +93,7 @@ func (c commRepo) GetComments(ctx context.Context, ff CommentFilter, com *[]mode
 
 func (c commRepo) NewComment(ctx context.Context, com **model.Comment) error {
 	ctx, log := loggr.GetLogger(ctx, "newComment-repo")
-	d, err := c.Acquire(ctx)
+	d, err := c.db.Acquire(ctx)
 	if err != nil {
 		return err
 	}
@@ -109,8 +106,8 @@ func (c commRepo) NewComment(ctx context.Context, com **model.Comment) error {
 	r := d.QueryRow(ctx, sql, (*com).ID, (*com).Parent, (*com).Text, (*com).By, (*com).CreatedAt)
 	err = r.Scan(&(*com).ID, &(*com).Parent, &(*com).Text, &(*com).By, &(*com).CreatedAt)
 	if err != nil {
-		e := errro.FromError(errro.ErrCommScanError, "failed to scan inserted comment", err)
-		log.Error(err, "failed to scan inserted comment", "query", sql)
+		e := errro.FromError(errro.ErrCommInsertError, "failed to insert comment", err)
+		log.Error(err, "failed to insert comment", "query", sql, "data", com)
 		return e
 	}
 

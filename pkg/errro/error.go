@@ -67,7 +67,7 @@ const (
 	ErrAuthInvalidCreds      = 9
 	ErrAuthMissingHeader     = 10
 	ErrAuthInvalidType       = 12
-	ErrAuthJWTMalformat      = 19
+	ErrAuthJWTMalformat      = 21
 )
 
 const (
@@ -82,6 +82,7 @@ const (
 const (
 	ErrCommDBError       = ErrFeedsDBError
 	ErrCommQueryError    = -14
+	ErrCommInsertError   = -19
 	ErrCommScanError     = -15
 	ErrCommBuildTreeFail = -10
 	ErrCommPubFail       = -11
@@ -93,7 +94,7 @@ const (
 	ErrCommNoComments    = ErrFeedsNoFeeds
 )
 
-type err struct {
+type Err struct {
 	c      int
 	m      string
 	e      error
@@ -106,19 +107,19 @@ const (
 	TDetailJSON
 )
 
-func New(code int, msg string) *err {
-	return &err{code, msg, nil, nil, 0}
+func New(code int, msg string) *Err {
+	return &Err{code, msg, nil, nil, 0}
 }
 
-func FromError(code int, msg string, e error) *err {
-	return &err{code, msg, e, nil, 0}
+func FromError(code int, msg string, e error) *Err {
+	return &Err{code, msg, e, nil, 0}
 }
 
-func (e err) Msg() string {
+func (e Err) Msg() string {
 	return e.m
 }
 
-func (e *err) Error() string {
+func (e *Err) Error() string {
 	if e.e != nil && e.m != e.e.Error() {
 		return fmt.Sprintf("%s: %s", e.m, e.e.Error())
 	}
@@ -126,24 +127,24 @@ func (e *err) Error() string {
 	return e.m
 }
 
-func (e *err) Code() int {
+func (e *Err) Code() int {
 	return e.c
 }
 
-func (e *err) WithDetail(detail []byte, detailType int) *resErr {
+func (e *Err) WithDetail(detail []byte, detailType int) *resErr {
 	e.detail = detail
 	e.t = detailType
 	return &resErr{e}
 }
 
-func (e *err) WithJSON(res JSONable) *resErr {
+func (e *Err) WithJSON(res JSONable) *resErr {
 	e.detail = res.JSON()
 	e.t = TDetailJSON
 	return &resErr{e}
 }
 
 type resErr struct {
-	*err
+	*Err
 }
 
 func (e *resErr) Error() string {
@@ -155,7 +156,7 @@ func (e *resErr) Error() string {
 }
 
 func (e *resErr) Msg() string {
-	return e.err.Msg()
+	return e.Err.Msg()
 }
 
 func (e *resErr) SendError(ctx fiber.Ctx, status int) error {
