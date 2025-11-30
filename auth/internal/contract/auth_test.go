@@ -9,6 +9,7 @@ import (
 	"github.com/booleanism/tetek/auth/internal/contract"
 	ijwt "github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/rabbitmq/amqp091-go"
@@ -96,7 +97,7 @@ func TestWorker(t *testing.T) {
 	}
 
 	for _, task := range tasks {
-		if err := contracts.AuthAdapter(ctx, tAuth, task.AuthTask, &res); err != nil {
+		if err := adapter.AuthAdapter(ctx, tAuth, task.AuthTask, &res); err != nil {
 			t.Fatal(err)
 		}
 

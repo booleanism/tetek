@@ -11,6 +11,7 @@ import (
 	"github.com/booleanism/tetek/comments/schemas"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/google/uuid"
@@ -168,7 +169,7 @@ func TestWorker(t *testing.T) {
 			p.Close()
 		}
 
-		if err := contracts.CommentsAdapter(ctx, assent, v.CommentsTask, &res); err != nil {
+		if err := adapter.CommentsAdapter(ctx, assent, v.CommentsTask, &res); err != nil {
 			t.Fatal(err)
 		}
 

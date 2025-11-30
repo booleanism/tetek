@@ -11,6 +11,7 @@ import (
 	"github.com/booleanism/tetek/account/schemas"
 	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/rabbitmq/amqp091-go"
@@ -154,7 +155,7 @@ func TestWorker(t *testing.T) {
 			(*p).Close()
 		}
 
-		if err := contracts.AccAdapter(ctx, tAccount, task.AccountTask, &res); err != nil {
+		if err := adapter.AccAdapter(ctx, tAccount, task.AccountTask, &res); err != nil {
 			t.Fatal(err)
 		}
 
