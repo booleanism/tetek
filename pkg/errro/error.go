@@ -77,6 +77,7 @@ const (
 	ErrFeedsNoFeeds              = ErrAccountNoUser
 	ErrFeedsDeleteFail           = 15
 	ErrFeedsParseFail            = ErrAccountParseFail
+	ErrFeedsUnknownCmd           = ErrCommUnknownCmd
 )
 
 const (

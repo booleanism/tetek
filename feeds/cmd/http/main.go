@@ -68,7 +68,8 @@ func main() {
 	rec := recipes.NewRecipes(repo, commContr)
 
 	feedsContr := contract.NewFeeds(mqCon, repo)
-	if _, err := feedsContr.WorkerFeedsListener(); err != nil {
+	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
+	if _, err := feedsContr.WorkerFeedsListener(workerCtx); err != nil {
 		panic(err)
 	}
 
