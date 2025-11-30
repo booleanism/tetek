@@ -29,7 +29,7 @@ type DealContract[T any, R any] struct {
 	mRes     sync.Mutex
 }
 
-func (c *DealContract[_, R]) Publish(ctx context.Context, task any) error {
+func (c *DealContract[_, R]) publish(ctx context.Context, task any) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
 	_, log := loggr.GetLogger(ctx, fmt.Sprintf("%s-task-publisher", c.name))
 
@@ -61,7 +61,7 @@ func (c *DealContract[_, R]) Publish(ctx context.Context, task any) error {
 	return nil
 }
 
-func (c *DealContract[_, R]) Consume(ctx context.Context, res any) error {
+func (c *DealContract[_, R]) consume(ctx context.Context, res any) error {
 	corrID := ctx.Value(keystore.RequestID{}).(string)
 	_, log := loggr.GetLogger(ctx, fmt.Sprintf("%s-result-consumer", c.name))
 

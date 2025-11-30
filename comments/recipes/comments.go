@@ -8,6 +8,7 @@ import (
 	"github.com/booleanism/tetek/comments/internal/repo"
 	amqpFeeds "github.com/booleanism/tetek/feeds/amqp"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/booleanism/tetek/pkg/loggr"
@@ -37,7 +38,7 @@ func (cr commRecipes) NewComment(ctx context.Context, req NewCommentRequest) (mo
 	// assume the head is feeds, then find it on feeds service
 	t := amqpFeeds.FeedsTask{Cmd: 0, Feeds: amqpFeeds.Feeds{ID: req.Head}}
 	feedsRes := &amqpFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
-	err := contracts.FeedsAdapter(ctx, cr.feeds, t, &feedsRes)
+	err := adapter.FeedsAdapter(ctx, cr.feeds, t, &feedsRes)
 	if err != nil {
 		return model.Comment{}, err
 	}

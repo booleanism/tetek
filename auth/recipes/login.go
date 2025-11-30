@@ -6,6 +6,7 @@ import (
 	"github.com/booleanism/tetek/account/amqp"
 	"github.com/booleanism/tetek/auth/internal/jwt"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
@@ -36,7 +37,7 @@ func (r *loginRecipe) Login(ctx context.Context, req LoginRequest) (string, errr
 
 	res := &amqp.AccountResult{}
 	task := amqp.AccountTask{Cmd: 0, User: *user}
-	if err := contracts.AccAdapter(ctx, r.l, task, &res); err != nil {
+	if err := adapter.AccAdapter(ctx, r.l, task, &res); err != nil {
 		return "", err
 	}
 

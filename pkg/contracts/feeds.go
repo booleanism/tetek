@@ -29,11 +29,11 @@ func FeedsAssent(con *amqp091.Connection) *localFeedsContr {
 }
 
 func (c *localFeedsContr) Publish(ctx context.Context, task any) error {
-	return c.d.Publish(ctx, task)
+	return c.d.publish(ctx, task)
 }
 
 func (c *localFeedsContr) Consume(ctx context.Context, res any) error {
-	return c.d.Consume(ctx, res)
+	return c.d.consume(ctx, res)
 }
 
 func (c *localFeedsContr) FeedsResListener(ctx context.Context, name string) error {

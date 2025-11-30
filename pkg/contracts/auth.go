@@ -27,11 +27,11 @@ func AuthAssent(con *amqp091.Connection) *localAuthContr {
 }
 
 func (c *localAuthContr) Publish(ctx context.Context, task any) error {
-	return c.d.Publish(ctx, task)
+	return c.d.publish(ctx, task)
 }
 
 func (c *localAuthContr) Consume(ctx context.Context, res any) error {
-	return c.d.Consume(ctx, res)
+	return c.d.consume(ctx, res)
 }
 
 func (c *localAuthContr) AuthResListener(ctx context.Context, name string) error {

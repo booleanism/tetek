@@ -29,11 +29,11 @@ func CommentsAssent(con *amqp091.Connection) *localCommContr {
 }
 
 func (c *localCommContr) Publish(ctx context.Context, task any) error {
-	return c.d.Publish(ctx, task)
+	return c.d.publish(ctx, task)
 }
 
 func (c *localCommContr) Consume(ctx context.Context, res any) error {
-	return c.d.Consume(ctx, res)
+	return c.d.consume(ctx, res)
 }
 
 func (c *localCommContr) CommentsResListener(ctx context.Context, name string) error {

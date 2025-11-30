@@ -8,6 +8,7 @@ import (
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/pkg/contracts"
+	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
@@ -130,7 +131,7 @@ func actualAuth(ctx context.Context, auth contracts.AuthDealer, authRes **amqp.A
 		return e.WithDetail(res.JSON(), errro.TDetailJSON)
 	}
 
-	if err := contracts.AuthAdapter(ctx, auth, *authTask, authRes); err != nil {
+	if err := adapter.AuthAdapter(ctx, auth, *authTask, authRes); err != nil {
 		res.Code = errro.ErrServiceUnavailable
 		res.Message = "auth service unavailable: publishing auth task"
 		e := errro.New(res.Code, res.Message)

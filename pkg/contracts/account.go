@@ -29,11 +29,11 @@ func AccountAssent(con *amqp091.Connection) *localAccContr {
 }
 
 func (c *localAccContr) Publish(ctx context.Context, task any) error {
-	return c.d.Publish(ctx, task)
+	return c.d.publish(ctx, task)
 }
 
 func (c *localAccContr) Consume(ctx context.Context, res any) error {
-	return c.d.Consume(ctx, res)
+	return c.d.consume(ctx, res)
 }
 
 func (c *localAccContr) AccountResListener(ctx context.Context, name string) error {
