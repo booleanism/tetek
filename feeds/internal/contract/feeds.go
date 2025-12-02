@@ -7,7 +7,7 @@ import (
 
 	"github.com/booleanism/tetek/feeds/infra/amqp"
 	"github.com/booleanism/tetek/feeds/internal/entities"
-	"github.com/booleanism/tetek/feeds/internal/pools"
+	"github.com/booleanism/tetek/feeds/internal/model/pools"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"

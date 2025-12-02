@@ -3,7 +3,7 @@ package router
 import (
 	"context"
 
-	"github.com/booleanism/tetek/feeds/internal/pools"
+	"github.com/booleanism/tetek/feeds/internal/model/pools"
 	"github.com/booleanism/tetek/feeds/recipes"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
