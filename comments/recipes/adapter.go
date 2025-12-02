@@ -3,7 +3,7 @@ package recipes
 import (
 	"context"
 
-	amqpFeeds "github.com/booleanism/tetek/feeds/amqp"
+	amqpFeeds "github.com/booleanism/tetek/feeds/infra/amqp"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/loggr"
 )

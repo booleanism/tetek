@@ -3,7 +3,7 @@ package contracts
 import (
 	"context"
 
-	"github.com/booleanism/tetek/feeds/amqp"
+	"github.com/booleanism/tetek/feeds/infra/amqp"
 	"github.com/rabbitmq/amqp091-go"
 )
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
-	"github.com/booleanism/tetek/feeds/amqp"
+	"github.com/booleanism/tetek/feeds/infra/amqp"
 	"github.com/booleanism/tetek/feeds/internal/contract"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/schemas"

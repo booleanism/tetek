@@ -7,7 +7,7 @@ import (
 	mqAcc "github.com/booleanism/tetek/account/amqp"
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
 	mqComm "github.com/booleanism/tetek/comments/amqp"
-	mqFeeds "github.com/booleanism/tetek/feeds/amqp"
+	mqFeeds "github.com/booleanism/tetek/feeds/infra/amqp"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
 )

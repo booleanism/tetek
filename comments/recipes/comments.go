@@ -6,7 +6,7 @@ import (
 	amqpAuth "github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/comments/internal/model"
 	"github.com/booleanism/tetek/comments/internal/repo"
-	amqpFeeds "github.com/booleanism/tetek/feeds/amqp"
+	amqpFeeds "github.com/booleanism/tetek/feeds/infra/amqp"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
