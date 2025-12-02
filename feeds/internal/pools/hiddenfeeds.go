@@ -3,11 +3,11 @@ package pools
 import (
 	"sync"
 
-	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/entities"
 )
 
 type HiddenFeeds struct {
-	Value []model.HiddenFeed
+	Value []entities.HiddenFeed
 }
 
 func (f *HiddenFeeds) Reset() {
@@ -17,7 +17,7 @@ func (f *HiddenFeeds) Reset() {
 var HiddenFeedsPool = sync.Pool{
 	New: func() any {
 		return &HiddenFeeds{
-			Value: make([]model.HiddenFeed, 0, 512),
+			Value: make([]entities.HiddenFeed, 0, 512),
 		}
 	},
 }

@@ -8,7 +8,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
-	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/entities"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/feeds/schemas"
 	"github.com/google/uuid"
@@ -73,8 +73,8 @@ type dbError interface {
 }
 
 type repoData struct {
-	Feed     []model.Feed
-	Hf       *model.HiddenFeed
+	Feed     []entities.Feed
+	Hf       *entities.HiddenFeed
 	ff       repo.FeedsFilter
 	expected dbError
 }
@@ -100,14 +100,14 @@ func TestGetFeeds(t *testing.T) {
 	p := db.Register(pgContainer.ConnectionString)
 	defer p.Close()
 	data := []repoData{
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{}, expected: dberr{nil, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{Type: "M"}, expected: dberr{nil, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{HiddenTo: "rootz"}, expected: dberr{nil, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 0}, expected: dberr{nil, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 1}, expected: dberr{nil, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 0, Offset: 0}, expected: dberr{nil, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 0, Offset: 1}, expected: dberr{pgx.ErrNoRows, ""}},
-		{Feed: []model.Feed{}, ff: repo.FeedsFilter{ID: uuid.New()}, expected: dberr{pgx.ErrNoRows, ""}}, // no such feed
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{}, expected: dberr{nil, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{Type: "M"}, expected: dberr{nil, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{HiddenTo: "rootz"}, expected: dberr{nil, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 0}, expected: dberr{nil, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 1}, expected: dberr{nil, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 0, Offset: 0}, expected: dberr{nil, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{Type: "M", HiddenTo: "rootz", Order: 0, Offset: 1}, expected: dberr{pgx.ErrNoRows, ""}},
+		{Feed: []entities.Feed{}, ff: repo.FeedsFilter{ID: uuid.New()}, expected: dberr{pgx.ErrNoRows, ""}}, // no such feed
 	}
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
@@ -142,9 +142,9 @@ func TestNewFeeds(t *testing.T) {
 	now := time.Now()
 
 	data := []repoData{
-		{Feed: []model.Feed{{}}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23502"}},
-		{Feed: []model.Feed{{ID: idExist, By: "root", URL: "localhost", Points: 0, NCommnents: 0, CreatedAt: &now}}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23514"}},            // missing type check
-		{Feed: []model.Feed{{ID: idExist, By: "root", URL: "localhost", Type: "M", Points: 0, NCommnents: 0, CreatedAt: &now}}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23505"}}, // duplicate key
+		{Feed: []entities.Feed{{}}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23502"}},
+		{Feed: []entities.Feed{{ID: idExist, By: "root", URL: "localhost", Points: 0, NCommnents: 0, CreatedAt: &now}}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23514"}},            // missing type check
+		{Feed: []entities.Feed{{ID: idExist, By: "root", URL: "localhost", Type: "M", Points: 0, NCommnents: 0, CreatedAt: &now}}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23505"}}, // duplicate key
 	}
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
@@ -179,8 +179,8 @@ func TestDeleteFeeds(t *testing.T) {
 	}
 
 	data := []repoData{
-		{Feed: []model.Feed{{}}, ff: repo.FeedsFilter{}, expected: dberr{pgx.ErrNoRows, ""}},  // no such feed
-		{Feed: []model.Feed{{}}, ff: repo.FeedsFilter{ID: idExist}, expected: dberr{nil, ""}}, // success
+		{Feed: []entities.Feed{{}}, ff: repo.FeedsFilter{}, expected: dberr{pgx.ErrNoRows, ""}},  // no such feed
+		{Feed: []entities.Feed{{}}, ff: repo.FeedsFilter{ID: idExist}, expected: dberr{nil, ""}}, // success
 	}
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
@@ -215,8 +215,8 @@ func TestHideFeeds(t *testing.T) {
 	}
 
 	data := []repoData{
-		{Feed: []model.Feed{{}}, Hf: &model.HiddenFeed{}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23503"}},           // no such feed
-		{Feed: []model.Feed{{}}, Hf: &model.HiddenFeed{FeedID: idExist}, ff: repo.FeedsFilter{}, expected: dberr{nil, ""}}, // no such feed
+		{Feed: []entities.Feed{{}}, Hf: &entities.HiddenFeed{}, ff: repo.FeedsFilter{}, expected: dberr{nil, "23503"}},           // no such feed
+		{Feed: []entities.Feed{{}}, Hf: &entities.HiddenFeed{FeedID: idExist}, ff: repo.FeedsFilter{}, expected: dberr{nil, ""}}, // no such feed
 	}
 
 	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/booleanism/tetek/feeds/infra/amqp"
-	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/entities"
 	"github.com/booleanism/tetek/feeds/internal/pools"
 	"github.com/booleanism/tetek/feeds/internal/repo"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -87,12 +87,12 @@ func (c *FeedsContr) WorkerFeedsListener(ctx context.Context) (*amqp091.Channel,
 					}
 
 					if err == pgx.ErrNoRows {
-						res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsNoFeeds, Message: "feeds not found", Detail: model.Feed{ID: ff.ID}})
+						res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsNoFeeds, Message: "feeds not found", Detail: entities.Feed{ID: ff.ID}})
 						feedsResultPublisher(log, task, ch, d, res, err)
 						return
 					}
 
-					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsDBError, Message: "something happen in our end", Detail: model.Feed{ID: ff.ID}})
+					res, _ := json.Marshal(&amqp.FeedsResult{Code: errro.ErrFeedsDBError, Message: "something happen in our end", Detail: entities.Feed{ID: ff.ID}})
 					feedsResultPublisher(log, task, ch, d, res, err)
 					return
 				}

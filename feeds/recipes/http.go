@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/booleanism/tetek/feeds/internal/entities"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/google/uuid"
@@ -17,7 +18,7 @@ type GetFeedsRequest struct {
 
 type GetFeedsResponse struct {
 	helper.GenericResponse
-	Details []model.Feed `json:"details"`
+	Details []entities.Feed `json:"details"`
 }
 
 func (r GetFeedsResponse) JSON() []byte {
@@ -55,9 +56,9 @@ type NewFeedResponse struct {
 	Detail NewFeedRequest `json:"detail"`
 }
 
-func (fr NewFeedRequest) ToFeed() model.Feed {
+func (fr NewFeedRequest) ToFeed() entities.Feed {
 	now := time.Now()
-	return model.Feed{
+	return entities.Feed{
 		ID:         uuid.New(),
 		Title:      fr.Title,
 		URL:        fr.URL,

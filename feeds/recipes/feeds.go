@@ -6,6 +6,7 @@ import (
 
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/comments/amqp"
+	"github.com/booleanism/tetek/feeds/internal/entities"
 	"github.com/booleanism/tetek/feeds/internal/model"
 	"github.com/booleanism/tetek/feeds/internal/pools"
 	"github.com/booleanism/tetek/feeds/internal/repo"
@@ -56,7 +57,7 @@ func (fr feedRecipes) Feeds(ctx context.Context, req GetFeedsRequest, f *pools.F
 	return fr.getFeeds(ctx, ff, &f.Value)
 }
 
-func (fr feedRecipes) getFeeds(ctx context.Context, ff repo.FeedsFilter, f *[]model.Feed) errro.Error {
+func (fr feedRecipes) getFeeds(ctx context.Context, ff repo.FeedsFilter, f *[]entities.Feed) errro.Error {
 	err := fr.repo.Feeds(ctx, ff, f)
 	if err == nil && len(*f) != 0 {
 		return nil

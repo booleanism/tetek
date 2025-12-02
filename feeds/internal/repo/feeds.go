@@ -6,7 +6,7 @@ import (
 
 	"github.com/Masterminds/squirrel"
 	"github.com/booleanism/tetek/db"
-	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/entities"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -24,10 +24,10 @@ type FeedsFilter struct {
 const limit = 30
 
 type FeedsRepo interface {
-	Feeds(context.Context, FeedsFilter, *[]model.Feed) error
-	NewFeed(context.Context, **model.Feed) error
-	DeleteFeed(context.Context, FeedsFilter, **model.Feed) error
-	HideFeed(context.Context, **model.HiddenFeed) error
+	Feeds(context.Context, FeedsFilter, *[]entities.Feed) error
+	NewFeed(context.Context, **entities.Feed) error
+	DeleteFeed(context.Context, FeedsFilter, **entities.Feed) error
+	HideFeed(context.Context, **entities.HiddenFeed) error
 }
 
 type feedsRepo struct {
@@ -39,7 +39,7 @@ func New(pool db.Acquireable, sq squirrel.StatementBuilderType) *feedsRepo {
 	return &feedsRepo{pool, sq}
 }
 
-func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter, feedsBuf *[]model.Feed) error {
+func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter, feedsBuf *[]entities.Feed) error {
 	ctx, log := loggr.GetLogger(ctx, "getFeeds-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
@@ -97,12 +97,12 @@ func (r *feedsRepo) Feeds(ctx context.Context, ff FeedsFilter, feedsBuf *[]model
 	return scanRows(ctx, rws, ff, feedsBuf)
 }
 
-func scanRows(ctx context.Context, rws pgx.Rows, ff FeedsFilter, buf *[]model.Feed) error {
+func scanRows(ctx context.Context, rws pgx.Rows, ff FeedsFilter, buf *[]entities.Feed) error {
 	_, log := loggr.GetLogger(ctx, "feedsScanner-repo")
 	// feeds := []model.Feed{}
 	n := 0
 	for rws.Next() {
-		f := model.Feed{}
+		f := entities.Feed{}
 		if err := rws.Scan(&f.ID, &f.Title, &f.URL, &f.Text, &f.By, &f.Type, &f.Points, &f.NCommnents, &f.CreatedAt); err != nil {
 			log.Error(err, "error occours scanning feeds rows")
 			return err
@@ -125,7 +125,7 @@ func scanRows(ctx context.Context, rws pgx.Rows, ff FeedsFilter, buf *[]model.Fe
 	return nil
 }
 
-func (r *feedsRepo) NewFeed(ctx context.Context, feed **model.Feed) error {
+func (r *feedsRepo) NewFeed(ctx context.Context, feed **entities.Feed) error {
 	ctx, log := loggr.GetLogger(ctx, "newFeed-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
@@ -143,7 +143,7 @@ func (r *feedsRepo) NewFeed(ctx context.Context, feed **model.Feed) error {
 	return err
 }
 
-func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter, feed **model.Feed) error {
+func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter, feed **entities.Feed) error {
 	ctx, log := loggr.GetLogger(ctx, "deleteFeed-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {
@@ -176,7 +176,7 @@ func (r *feedsRepo) DeleteFeed(ctx context.Context, ff FeedsFilter, feed **model
 	return err
 }
 
-func (r *feedsRepo) HideFeed(ctx context.Context, hf **model.HiddenFeed) error {
+func (r *feedsRepo) HideFeed(ctx context.Context, hf **entities.HiddenFeed) error {
 	ctx, log := loggr.GetLogger(ctx, "hideFeed-repo")
 	q, err := r.pool.Acquire(ctx)
 	if err != nil {

@@ -1,11 +1,11 @@
 package amqp
 
 import (
-	"github.com/booleanism/tetek/feeds/internal/model"
+	"github.com/booleanism/tetek/feeds/internal/entities"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type Feeds = model.Feed
+type Feeds = entities.Feed
 
 const (
 	FeedsExchange     = "x_feeds"
