@@ -5,15 +5,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/booleanism/tetek/account/amqp"
-	"github.com/booleanism/tetek/account/internal/contract"
-	"github.com/booleanism/tetek/account/internal/repo"
-	"github.com/booleanism/tetek/account/schemas"
-	"github.com/booleanism/tetek/db"
+	amqp "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
+	contract "github.com/booleanism/tetek/feeds/internal/infra/messaging/rabbitmq"
+	"github.com/booleanism/tetek/feeds/internal/usecases"
+	"github.com/booleanism/tetek/feeds/internal/usecases/repo"
+	"github.com/booleanism/tetek/feeds/schemas"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/keystore"
+	"github.com/google/uuid"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -21,14 +23,14 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-type mqCon struct {
+type cont struct {
 	*rabbitmq.RabbitMQContainer
 	*postgres.PostgresContainer
 	dbConStr string
 	mqConStr string
 }
 
-var container = &mqCon{}
+var container = &cont{}
 
 func init() {
 	ctx := context.Background()
@@ -49,7 +51,7 @@ func init() {
 
 	pg, err := postgres.Run(ctx,
 		"postgres:18-alpine",
-		postgres.WithDatabase("accounttestdb"),
+		postgres.WithDatabase("feedstestdb"),
 		postgres.WithUsername("postgres"),
 		postgres.WithPassword("postgres"),
 		testcontainers.WithWaitStrategy(
@@ -67,7 +69,7 @@ func init() {
 
 	cmd := []string{
 		"sh", "-c",
-		"psql -U postgres -d accounttestdb <<'EOF'\n" + schemas.AccountSQL + "\nEOF",
+		"psql -U postgres -d feedstestdb <<'EOF'\n" + schemas.FeedsSQL + "\nEOF",
 	}
 	_, _, err = pg.Exec(ctx, cmd)
 	if err != nil {
@@ -88,8 +90,8 @@ func TestMain(m *testing.M) {
 	}
 }
 
-type task struct {
-	amqp.AccountTask
+type testData struct {
+	amqp.FeedsTask
 	expected int
 }
 
@@ -102,10 +104,13 @@ func TestWorker(t *testing.T) {
 	p := db.Register(container.dbConStr)
 	defer p.Close()
 
-	repo := repo.NewUserRepo(p)
+	repo := repo.NewFeedsRepo(p)
+	uc := usecases.NewFeedsUsecase(repo)
 
-	acc := contract.NewAccount(con, repo)
-	ch, err := acc.WorkerAccountListener(context.Background())
+	ctx := context.WithValue(context.Background(), keystore.RequestID{}, "test")
+
+	acc := contract.NewFeeds(con, uc)
+	ch, err := acc.WorkerFeedsListener(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,50 +120,68 @@ func TestWorker(t *testing.T) {
 		}
 	}()
 
-	tAccount := contracts.AccountAssent(con)
-	if err := tAccount.AccountResListener(context.Background(), "test"); err != nil {
+	tFeeds := contracts.FeedsAssent(con)
+	if err := tFeeds.FeedsResListener(context.Background(), "test"); err != nil {
 		t.Fatal(err)
 	}
 
-	ctx := context.WithValue(context.Background(), keystore.RequestID{}, "test")
+	idPass, err := uuid.Parse("e13cfca7-6bb0-4f67-ab96-e8941c20911a")
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	res := &amqp.AccountResult{}
-	tasks := []task{
+	res := &amqp.FeedsResult{}
+	tasks := []testData{
 		{
-			AccountTask: amqp.AccountTask{
-				Cmd: 0, User: amqp.User{Uname: "root"},
+			FeedsTask: amqp.FeedsTask{
+				Feeds: amqp.Feeds{
+					ID: uuid.New(),
+				},
+				Cmd: 1,
+			},
+			expected: errro.ErrFeedsUnknownCmd,
+		},
+		{
+			FeedsTask: amqp.FeedsTask{
+				Feeds: amqp.Feeds{
+					ID:   idPass,
+					Type: "M",
+				},
+				Cmd: 0,
 			},
 			expected: errro.Success,
 		},
 		{
-			AccountTask: amqp.AccountTask{
-				Cmd: 1, User: amqp.User{Uname: "root"},
+			FeedsTask: amqp.FeedsTask{
+				Feeds: amqp.Feeds{
+					ID:   uuid.New(),
+					Type: "M",
+				},
+				Cmd: 0,
 			},
-			expected: errro.ErrAccountUnknownCmd,
+			expected: errro.ErrFeedsNoFeeds,
 		},
 		{
-			AccountTask: amqp.AccountTask{
-				Cmd: 0, User: amqp.User{Uname: "nouser"},
+			FeedsTask: amqp.FeedsTask{
+				Feeds: amqp.Feeds{
+					ID: uuid.New(),
+				},
+				Cmd: 0,
 			},
-			expected: errro.ErrAccountNoUser,
-		},
-		{
-			AccountTask: amqp.AccountTask{
-				Cmd: 0, User: amqp.User{Uname: "root"},
-			},
-			expected: errro.ErrAccountDBError,
+			expected: errro.ErrFeedsDBError,
 		},
 	}
 
 	for _, task := range tasks {
-		if task.expected == errro.ErrAccountDBError {
-			(*p).Close()
+		if task.expected == errro.ErrFeedsDBError {
+			p.Close()
 		}
 
-		if err := adapter.AccountAdapter(ctx, tAccount, task.AccountTask, &res); err != nil {
+		if err := adapter.FeedsAdapter(ctx, tFeeds, task.FeedsTask, &res); err != nil {
 			t.Fatal(err)
 		}
 
+		t.Log(res)
 		if res.Code != task.expected {
 			t.Fail()
 		}

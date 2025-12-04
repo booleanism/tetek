@@ -3,7 +3,7 @@ package contracts
 import (
 	"context"
 
-	"github.com/booleanism/tetek/account/amqp"
+	messaging "github.com/booleanism/tetek/account/infra/messaging/rabbitmq"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -12,18 +12,18 @@ type AccountDealer interface {
 }
 
 type localAccContr struct {
-	d DealContract[amqp.AccountTask, amqp.AccountResult]
+	d DealContract[messaging.AccountTask, messaging.AccountResult]
 }
 
 func AccountAssent(con *amqp091.Connection) *localAccContr {
 	return &localAccContr{
-		d: DealContract[amqp.AccountTask, amqp.AccountResult]{
+		d: DealContract[messaging.AccountTask, messaging.AccountResult]{
 			con:      con,
 			name:     "account",
-			exchange: amqp.AccountExchange,
-			trk:      amqp.AccountTaskRk,
-			rrk:      amqp.AccountResRk,
-			res:      make(map[string]chan *amqp.AccountResult),
+			exchange: messaging.AccountExchange,
+			trk:      messaging.AccountTaskRk,
+			rrk:      messaging.AccountResRk,
+			res:      make(map[string]chan *messaging.AccountResult),
 		},
 	}
 }
@@ -37,7 +37,7 @@ func (c *localAccContr) Consume(ctx context.Context, res any) error {
 }
 
 func (c *localAccContr) AccountResListener(ctx context.Context, name string) error {
-	return c.d.resListener(ctx, name, amqp.AccountSetup)
+	return c.d.resListener(ctx, name, messaging.AccountSetup)
 }
 
 func (c *localAccContr) Name() string {

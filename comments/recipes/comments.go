@@ -6,7 +6,7 @@ import (
 	amqpAuth "github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/comments/internal/model"
 	"github.com/booleanism/tetek/comments/internal/repo"
-	amqpFeeds "github.com/booleanism/tetek/feeds/infra/amqp"
+	msgFeeds "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -36,14 +36,14 @@ func (cr commRecipes) NewComment(ctx context.Context, req NewCommentRequest) (mo
 	}).toComment()
 
 	// assume the head is feeds, then find it on feeds service
-	t := amqpFeeds.FeedsTask{Cmd: 0, Feeds: amqpFeeds.Feeds{ID: req.Head}}
-	feedsRes := &amqpFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
+	t := msgFeeds.FeedsTask{Cmd: 0, Feeds: msgFeeds.Feeds{ID: req.Head}}
+	feedsRes := &msgFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
 	err := adapter.FeedsAdapter(ctx, cr.feeds, t, &feedsRes)
 	if err != nil {
 		return model.Comment{}, err
 	}
 
-	com.Parent = feedsRes.Detail.ID
+	com.Parent = feedsRes.Details[0].ID
 
 	// if no feeds, we took into comments database it self
 	if feedsRes.Code != errro.Success {
@@ -75,9 +75,9 @@ func (cr commRecipes) getCommentsHead(ctx context.Context, cf repo.CommentFilter
 	return nil
 }
 
-func (cr commRecipes) actualNewComment(ctx context.Context, com *model.Comment, res *amqpFeeds.FeedsResult) errro.Error {
+func (cr commRecipes) actualNewComment(ctx context.Context, com *model.Comment, res *msgFeeds.FeedsResult) errro.Error {
 	ctx, log := loggr.GetLogger(ctx, "actual-new-comment")
-	com.Parent = res.Detail.ID
+	com.Parent = res.Details[0].ID
 	err := cr.repo.NewComment(ctx, &com)
 	if err != nil {
 		e := errro.FromError(errro.ErrCommDBError, "failed to insert new comment", err)

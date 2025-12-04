@@ -44,6 +44,7 @@ const (
 	ErrAccountUserAlreadyExist   = 7
 	ErrAccountRegistFail         = 8
 	ErrAccountInvalidRegistParam = ErrAuthInvalidLoginParam
+	ErrAccountPasswdLength       = ErrAuthInvalidLoginParam
 	ErrAccountUnknownCmd         = ErrCommUnknownCmd
 )
 
@@ -78,6 +79,11 @@ const (
 	ErrFeedsDeleteFail           = 15
 	ErrFeedsParseFail            = ErrAccountParseFail
 	ErrFeedsUnknownCmd           = ErrCommUnknownCmd
+	ErrFeedsUnathorized          = 22
+	ErrFeedsUnableToHide         = -20
+	ErrFeedsGetHiddenFeeds       = -21
+	ErrFeedsHidden               = 23
+	ErrFeedsInvalidType          = ErrAuthInvalidType
 )
 
 const (

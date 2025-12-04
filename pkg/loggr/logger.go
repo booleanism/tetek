@@ -18,10 +18,10 @@ func GetLogger(ctx context.Context, scope string) (context.Context, logr.Logger)
 	if err != nil {
 		zl := zerolog.New(os.Stderr)
 		log = NewLogger(scope, &zl)
+	} else {
+		// up log to use with serive name
+		log = log.WithName(scope)
 	}
-	// up log to use with serive name
-	log = log.WithName(scope)
-
 	ctx = logr.NewContext(ctx, log)
 	return ctx, log
 }

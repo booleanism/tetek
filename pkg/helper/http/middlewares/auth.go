@@ -4,7 +4,6 @@ import (
 	"context"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/booleanism/tetek/auth/amqp"
 	"github.com/booleanism/tetek/pkg/contracts"
@@ -33,7 +32,7 @@ func OptionalAuth(auth contracts.AuthDealer) fiber.Handler {
 		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
 		cto, cancel := context.WithTimeout(
 			c,
-			1*time.Second,
+			helper.Timeout,
 		)
 		defer cancel()
 

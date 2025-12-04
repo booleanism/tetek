@@ -37,7 +37,7 @@ func (r *loginRecipe) Login(ctx context.Context, req LoginRequest) (string, errr
 
 	res := &amqp.AccountResult{}
 	task := amqp.AccountTask{Cmd: 0, User: *user}
-	if err := adapter.AccAdapter(ctx, r.l, task, &res); err != nil {
+	if err := adapter.AccountAdapter(ctx, r.l, task, &res); err != nil {
 		return "", err
 	}
 

@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 
-	"github.com/Masterminds/squirrel"
-	"github.com/booleanism/tetek/db"
-	"github.com/booleanism/tetek/feeds/internal/contract"
-	"github.com/booleanism/tetek/feeds/internal/repo"
+	contract "github.com/booleanism/tetek/feeds/internal/infra/messaging/rabbitmq"
+	"github.com/booleanism/tetek/feeds/internal/usecases"
+	"github.com/booleanism/tetek/feeds/internal/usecases/repo"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
@@ -41,13 +41,13 @@ func main() {
 		panic(err)
 	}
 
-	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
-	rep := repo.New(dbPool, sq)
+	rep := repo.NewFeedsRepo(dbPool)
+	uc := usecases.NewFeedsUsecase(rep)
 
 	baseCtx := context.Background()
 
 	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
-	feeds := contract.NewFeeds(mqCon, rep)
+	feeds := contract.NewFeeds(mqCon, uc)
 	ch, err := feeds.WorkerFeedsListener(workerCtx)
 	if err != nil {
 		panic(err)

@@ -4,13 +4,12 @@ import (
 	"context"
 	"os"
 
-	"github.com/Masterminds/squirrel"
-	"github.com/booleanism/tetek/db"
 	"github.com/booleanism/tetek/docs"
-	"github.com/booleanism/tetek/feeds/internal/contract"
-	"github.com/booleanism/tetek/feeds/internal/repo"
-	router "github.com/booleanism/tetek/feeds/presentation/handlers/fiber"
-	"github.com/booleanism/tetek/feeds/recipes"
+	contract "github.com/booleanism/tetek/feeds/internal/infra/messaging/rabbitmq"
+	handlers "github.com/booleanism/tetek/feeds/internal/presentation/handlers/fiber"
+	"github.com/booleanism/tetek/feeds/internal/usecases"
+	"github.com/booleanism/tetek/feeds/internal/usecases/repo"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/booleanism/tetek/pkg/loggr"
@@ -48,8 +47,7 @@ func main() {
 		panic(err)
 	}
 
-	sq := squirrel.StatementBuilder.PlaceholderFormat(squirrel.Dollar)
-	repo := repo.New(dbPool, sq)
+	repo := repo.NewFeedsRepo(dbPool)
 
 	baseCtx := context.Background()
 
@@ -65,15 +63,15 @@ func main() {
 		panic(err)
 	}
 
-	rec := recipes.NewRecipes(repo, commContr)
+	uc := usecases.NewFeedsUsecase(repo)
 
-	feedsContr := contract.NewFeeds(mqCon, repo)
+	feedsContr := contract.NewFeeds(mqCon, uc)
 	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	if _, err := feedsContr.WorkerFeedsListener(workerCtx); err != nil {
 		panic(err)
 	}
 
-	router := router.NewFeedRouter(rec)
+	router := handlers.NewFeedRouter(uc, commContr)
 
 	endp := "/api/v0"
 	app := fiber.New()
