@@ -7,12 +7,19 @@ import (
 	mqAcc "github.com/booleanism/tetek/account/amqp"
 	mqAuth "github.com/booleanism/tetek/auth/amqp"
 	mqComm "github.com/booleanism/tetek/comments/amqp"
-	mqFeeds "github.com/booleanism/tetek/feeds/infra/amqp"
+	msgFeeds "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
 )
 
-func AccAdapter(ctx context.Context, acc contracts.AccountDealer, task mqAcc.AccountTask, res **mqAcc.AccountResult) errro.Error {
+type (
+	AccountAdapterFn  = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
+	AuthAdapterFn     = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
+	FeedsAdapterFn    = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
+	CommentsAdapterFn = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
+)
+
+func AccountAdapter(ctx context.Context, acc contracts.AccountDealer, task mqAcc.AccountTask, res **mqAcc.AccountResult) errro.Error {
 	return adapter(ctx, acc, task, res)
 }
 
@@ -20,7 +27,7 @@ func AuthAdapter(ctx context.Context, auth contracts.AuthDealer, task mqAuth.Aut
 	return adapter(ctx, auth, task, res)
 }
 
-func FeedsAdapter(ctx context.Context, feeds contracts.FeedsDealer, task mqFeeds.FeedsTask, res **mqFeeds.FeedsResult) errro.Error {
+func FeedsAdapter(ctx context.Context, feeds contracts.FeedsDealer, task msgFeeds.FeedsTask, res **msgFeeds.FeedsResult) errro.Error {
 	return adapter(ctx, feeds, task, res)
 }
 
