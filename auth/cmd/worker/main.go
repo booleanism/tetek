@@ -4,8 +4,8 @@ import (
 	"context"
 	"os"
 
-	"github.com/booleanism/tetek/auth/internal/contract"
-	"github.com/booleanism/tetek/auth/internal/jwt"
+	messaging "github.com/booleanism/tetek/auth/internal/infra/messaging/rabbitmq"
+	"github.com/booleanism/tetek/auth/internal/usecases/jwt"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
@@ -37,7 +37,7 @@ func main() {
 	}
 
 	jwt := jwt.NewJwt([]byte(jwtSecret))
-	authCtr := contract.NewAuth(mqCon, jwt)
+	authCtr := messaging.NewAuth(mqCon, jwt)
 
 	workerCtx := context.Background()
 	workerCtx = logr.NewContext(workerCtx, loggr.NewLogger(ServiceName, &zl))

@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	mqAuth "github.com/booleanism/tetek/auth/amqp"
+	messaging "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/feeds/internal/domain/model/pools"
 	"github.com/booleanism/tetek/feeds/internal/usecases"
 	"github.com/booleanism/tetek/feeds/internal/usecases/dto"
@@ -50,7 +50,7 @@ func (fr FeedsRouter) GetFeeds(ctx fiber.Ctx) error {
 	defer pools.FeedsPool.Put(fBuf)
 	defer fBuf.Reset()
 
-	jwt, ok := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
+	jwt, ok := ctx.Value(keystore.AuthRes{}).(*messaging.AuthResult)
 	if ok {
 		req.Uname = jwt.Claims.Uname
 	}

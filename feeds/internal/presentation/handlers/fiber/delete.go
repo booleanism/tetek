@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 
-	"github.com/booleanism/tetek/auth/amqp"
+	messaging "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/feeds/internal/usecases/dto"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
@@ -22,7 +22,7 @@ func (fr FeedsRouter) DeleteFeed(ctx fiber.Ctx) error {
 		return err.SendError(ctx, fiber.StatusBadRequest)
 	}
 
-	jwt, ok := c.Value(keystore.AuthRes{}).(*amqp.AuthResult)
+	jwt, ok := c.Value(keystore.AuthRes{}).(*messaging.AuthResult)
 	if !ok {
 		gRes.Code = errro.ErrAuthInvalidType
 		gRes.Message = "missing jwt"

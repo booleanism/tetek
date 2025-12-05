@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/booleanism/tetek/auth/amqp"
+	messaging "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -29,14 +29,14 @@ func OptionalAuth(auth contracts.AuthDealer) fiber.Handler {
 		// system assumes it's valid jwt format if user passes Authorization header.
 		// And if auth worker dead, then it will wait for 5 second to make sure.
 		// Keep calm, it's affected only and only if auth worker is dead.
-		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
+		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &messaging.AuthTask{Jwt: jwt})
 		cto, cancel := context.WithTimeout(
 			c,
 			helper.Timeout,
 		)
 		defer cancel()
 
-		var authRes *amqp.AuthResult
+		var authRes *messaging.AuthResult
 		if err := actualAuth(cto, auth, &authRes); err != nil {
 			return ctx.Next()
 		}
@@ -93,14 +93,14 @@ func Auth(auth contracts.AuthDealer) fiber.Handler {
 			return er.WithDetail(res.JSON(), errro.TDetailJSON).SendError(ctx, fiber.StatusBadRequest)
 		}
 
-		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &amqp.AuthTask{Jwt: jwt})
+		c := context.WithValue(ctx.Context(), keystore.AuthTask{}, &messaging.AuthTask{Jwt: jwt})
 		cto, cancel := context.WithTimeout(
 			c,
 			helper.Timeout,
 		)
 		defer cancel()
 
-		var authRes *amqp.AuthResult
+		var authRes *messaging.AuthResult
 		if err := actualAuth(cto, auth, &authRes); err != nil {
 			if err.Code() == errro.ErrServiceUnavailable {
 				return err.SendError(ctx, fiber.StatusRequestTimeout)
@@ -120,8 +120,8 @@ func Auth(auth contracts.AuthDealer) fiber.Handler {
 	}
 }
 
-func actualAuth(ctx context.Context, auth contracts.AuthDealer, authRes **amqp.AuthResult) errro.ResError {
-	authTask, ok := ctx.Value(keystore.AuthTask{}).(*amqp.AuthTask)
+func actualAuth(ctx context.Context, auth contracts.AuthDealer, authRes **messaging.AuthResult) errro.ResError {
+	authTask, ok := ctx.Value(keystore.AuthTask{}).(*messaging.AuthTask)
 	res := helper.GenericResponse{}
 	if !ok {
 		res.Code = errro.ErrAuthEmptyJWT

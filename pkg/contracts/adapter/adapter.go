@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	mqAcc "github.com/booleanism/tetek/account/infra/messaging/rabbitmq"
-	mqAuth "github.com/booleanism/tetek/auth/amqp"
+	mqAuth "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
 	mqComm "github.com/booleanism/tetek/comments/amqp"
 	msgFeeds "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/pkg/contracts"

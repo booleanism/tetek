@@ -4,10 +4,10 @@ import (
 	"context"
 	"os"
 
-	"github.com/booleanism/tetek/auth/cmd/http/router"
-	"github.com/booleanism/tetek/auth/internal/contract"
-	"github.com/booleanism/tetek/auth/internal/jwt"
-	"github.com/booleanism/tetek/auth/recipes"
+	messaging "github.com/booleanism/tetek/auth/internal/infra/messaging/rabbitmq"
+	handlers "github.com/booleanism/tetek/auth/internal/presentation/handlers/fiber"
+	"github.com/booleanism/tetek/auth/internal/usecases"
+	"github.com/booleanism/tetek/auth/internal/usecases/jwt"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/booleanism/tetek/pkg/loggr"
@@ -48,7 +48,7 @@ func main() {
 	}
 
 	jwt := jwt.NewJwt([]byte(jwtSecret))
-	auth := contract.NewAuth(mqCon, jwt)
+	auth := messaging.NewAuth(mqCon, jwt)
 
 	baseCtx := context.Background()
 
@@ -70,14 +70,14 @@ func main() {
 		panic(err)
 	}
 
-	logRec := recipes.NewLogin(accContr, jwt)
+	logRec := usecases.NewAuthUseCases(accContr, jwt)
 
 	app := fiber.New()
 	api := app.Group("/api/v0")
 	{
 		api.Use(middlewares.GenerateRequestID)
 		api.Use(middlewares.Logger(ServiceName, &zl))
-		api.Post("/", router.Login(logRec)).Name("login-handler")
+		api.Post("/", handlers.Login(logRec)).Name("login-handler")
 	}
 
 	if err := app.Listen(":8081"); err != nil {

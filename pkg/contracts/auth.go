@@ -3,7 +3,7 @@ package contracts
 import (
 	"context"
 
-	"github.com/booleanism/tetek/auth/amqp"
+	messaging "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
 	"github.com/rabbitmq/amqp091-go"
 )
 
@@ -12,17 +12,17 @@ type AuthDealer interface {
 }
 
 type localAuthContr struct {
-	d DealContract[amqp.AuthTask, amqp.AuthResult]
+	d DealContract[messaging.AuthTask, messaging.AuthResult]
 }
 
 func AuthAssent(con *amqp091.Connection) *localAuthContr {
-	return &localAuthContr{d: DealContract[amqp.AuthTask, amqp.AuthResult]{
+	return &localAuthContr{d: DealContract[messaging.AuthTask, messaging.AuthResult]{
 		con:      con,
 		name:     "auth",
-		exchange: amqp.AuthExchange,
-		trk:      amqp.AuthTaskRk,
-		rrk:      amqp.AuthResRk,
-		res:      make(map[string]chan *amqp.AuthResult),
+		exchange: messaging.AuthExchange,
+		trk:      messaging.AuthTaskRk,
+		rrk:      messaging.AuthResRk,
+		res:      make(map[string]chan *messaging.AuthResult),
 	}}
 }
 
@@ -35,7 +35,7 @@ func (c *localAuthContr) Consume(ctx context.Context, res any) error {
 }
 
 func (c *localAuthContr) AuthResListener(ctx context.Context, name string) error {
-	return c.d.resListener(ctx, name, amqp.AuthSetup)
+	return c.d.resListener(ctx, name, messaging.AuthSetup)
 }
 
 func (c *localAuthContr) Name() string {

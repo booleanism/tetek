@@ -4,9 +4,10 @@ import (
 	"context"
 	"os"
 
-	"github.com/booleanism/tetek/account/internal/contract"
-	"github.com/booleanism/tetek/account/internal/repo"
-	"github.com/booleanism/tetek/db"
+	messaging "github.com/booleanism/tetek/account/internal/infra/messaging/rabbitmq"
+	"github.com/booleanism/tetek/account/internal/usecases"
+	"github.com/booleanism/tetek/account/internal/usecases/repo"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
@@ -37,7 +38,8 @@ func main() {
 	}
 
 	rep := repo.NewUserRepo(dbPool)
-	acc := contract.NewAccount(mqCon, rep)
+	uc := usecases.NewAccountUseCases(rep)
+	acc := messaging.NewAccount(mqCon, uc)
 
 	workerCtx := logr.NewContext(context.Background(), loggr.NewLogger("account", &zl))
 	ch, err := acc.WorkerAccountListener(workerCtx)

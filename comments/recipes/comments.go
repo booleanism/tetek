@@ -3,10 +3,10 @@ package recipes
 import (
 	"context"
 
-	amqpAuth "github.com/booleanism/tetek/auth/amqp"
+	mqAuth "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/comments/internal/model"
 	"github.com/booleanism/tetek/comments/internal/repo"
-	msgFeeds "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
+	mqFeeds "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -29,15 +29,15 @@ func NewCommentRecipes(repo repo.CommentsRepo, feedsContr contracts.FeedsDealer,
 }
 
 func (cr commRecipes) NewComment(ctx context.Context, req NewCommentRequest) (model.Comment, errro.Error) {
-	jwt := ctx.Value(keystore.AuthRes{}).(*amqpAuth.AuthResult)
+	jwt := ctx.Value(keystore.AuthRes{}).(*mqAuth.AuthResult)
 	com := (newCommentRequest{
 		NewCommentRequest: req,
 		By:                jwt.Claims.Uname,
 	}).toComment()
 
 	// assume the head is feeds, then find it on feeds service
-	t := msgFeeds.FeedsTask{Cmd: 0, Feeds: msgFeeds.Feeds{ID: req.Head}}
-	feedsRes := &msgFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
+	t := mqFeeds.FeedsTask{Cmd: 0, Feeds: mqFeeds.Feeds{ID: req.Head}}
+	feedsRes := &mqFeeds.FeedsResult{Code: errro.ErrFeedsNoFeeds}
 	err := adapter.FeedsAdapter(ctx, cr.feeds, t, &feedsRes)
 	if err != nil {
 		return model.Comment{}, err
@@ -75,7 +75,7 @@ func (cr commRecipes) getCommentsHead(ctx context.Context, cf repo.CommentFilter
 	return nil
 }
 
-func (cr commRecipes) actualNewComment(ctx context.Context, com *model.Comment, res *msgFeeds.FeedsResult) errro.Error {
+func (cr commRecipes) actualNewComment(ctx context.Context, com *model.Comment, res *mqFeeds.FeedsResult) errro.Error {
 	ctx, log := loggr.GetLogger(ctx, "actual-new-comment")
 	com.Parent = res.Details[0].ID
 	err := cr.repo.NewComment(ctx, &com)

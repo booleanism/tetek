@@ -4,11 +4,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/booleanism/tetek/account/cmd/http/router"
-	"github.com/booleanism/tetek/account/internal/contract"
-	"github.com/booleanism/tetek/account/internal/repo"
-	"github.com/booleanism/tetek/account/recipes"
-	"github.com/booleanism/tetek/db"
+	messaging "github.com/booleanism/tetek/account/internal/infra/messaging/rabbitmq"
+	handlers "github.com/booleanism/tetek/account/internal/presentation/handlers/fiber"
+	"github.com/booleanism/tetek/account/internal/usecases"
+	"github.com/booleanism/tetek/account/internal/usecases/repo"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/booleanism/tetek/pkg/loggr"
@@ -60,8 +60,8 @@ func main() {
 	}
 
 	rep := repo.NewUserRepo(dbPool)
-	rec := recipes.New(rep)
-	acc := contract.NewAccount(mqCon, rep)
+	uc := usecases.NewAccountUseCases(rep)
+	acc := messaging.NewAccount(mqCon, uc)
 
 	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
 	ch, err := acc.WorkerAccountListener(workerCtx)
@@ -74,15 +74,15 @@ func main() {
 		}
 	}()
 
-	router := router.NewRouter(rec)
+	h := handlers.NewHandlers(uc)
 
 	app := fiber.New()
 	api := app.Group("/api/v0")
 	{
 		api.Use(middlewares.GenerateRequestID)
 		api.Use(middlewares.Logger(ServiceName, &zl))
-		api.Post("/", router.Regist).Name("registration-handler")
-		api.Get("/:uname", middlewares.Auth(authContr), router.Profile).Name("profile-handler")
+		api.Post("/", h.RegistUser).Name("registration-handler")
+		api.Get("/:uname", middlewares.Auth(authContr), h.Profile).Name("profile-handler")
 	}
 
 	if err := app.Listen(":8082"); err != nil {
