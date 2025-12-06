@@ -3,14 +3,14 @@ package usecases
 import (
 	"context"
 
-	"github.com/booleanism/tetek/comments/amqp"
+	messaging "github.com/booleanism/tetek/comments/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/feeds/internal/domain/model"
 	"github.com/booleanism/tetek/feeds/internal/domain/model/pools"
 	"github.com/booleanism/tetek/feeds/internal/usecases/dto"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
-	"github.com/booleanism/tetek/pkg/helper"
+	helper "github.com/booleanism/tetek/pkg/helper/comments"
 	"github.com/booleanism/tetek/pkg/loggr"
 )
 
@@ -76,8 +76,8 @@ func (uc usecases) ShowFeed(ctx context.Context, commsDealer contracts.CommentsD
 		return err
 	}
 
-	cBuf := &amqp.CommentsResult{}
-	task := amqp.CommentsTask{}
+	cBuf := &messaging.CommentsResult{}
+	task := messaging.CommentsTask{}
 	if err := commAdapter(ctx, commsDealer, task, &cBuf); err != nil {
 		return err
 	}

@@ -1,11 +1,11 @@
-package amqp
+package messaging
 
 import (
-	"github.com/booleanism/tetek/comments/internal/model"
+	"github.com/booleanism/tetek/comments/internal/usecases/dto"
 	"github.com/rabbitmq/amqp091-go"
 )
 
-type Comment = model.Comment
+type Comment = dto.Comment
 
 const (
 	CommentsExchange     = "x_comments"

@@ -4,11 +4,11 @@ import (
 	"context"
 	"os"
 
-	"github.com/booleanism/tetek/comments/cmd/http/router"
-	"github.com/booleanism/tetek/comments/internal/contract"
-	"github.com/booleanism/tetek/comments/internal/repo"
-	"github.com/booleanism/tetek/comments/recipes"
-	"github.com/booleanism/tetek/db"
+	messaging "github.com/booleanism/tetek/comments/internal/infra/messaging/rabbitmq"
+	handlers "github.com/booleanism/tetek/comments/internal/presentation/handlers/fiber"
+	"github.com/booleanism/tetek/comments/internal/usecases"
+	"github.com/booleanism/tetek/comments/internal/usecases/repo"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/helper/http/middlewares"
 	"github.com/booleanism/tetek/pkg/loggr"
@@ -64,12 +64,14 @@ func main() {
 		panic(err)
 	}
 
-	repo := repo.NewCommRepo(dbPool)
-	rec := recipes.NewCommentRecipes(repo, feedsContr, authContr)
-	router := router.NewCommRouter(rec)
+	repo := repo.NewCommentsRepo(dbPool)
+	rec := usecases.NewCommentsUsecases(repo)
+	handlers := handlers.NewHandlers(rec, feedsContr)
+
+	uc := usecases.NewCommentsUsecases(repo)
 
 	workerCtx := logr.NewContext(baseCtx, loggr.NewLogger(ServiceName, &zl))
-	ch, err := contract.NewComments(mqCon, repo).WorkerCommentsListener(workerCtx)
+	ch, err := messaging.NewComments(mqCon, uc).WorkerCommentsListener(workerCtx)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +88,7 @@ func main() {
 	apiEp.Use(middlewares.Logger("comments-service", &zl))
 
 	{
-		apiEp.Post("/", middlewares.Auth(authContr), router.NewComment).Name("new-comment-handler")
+		apiEp.Post("/", middlewares.Auth(authContr), handlers.NewComment).Name("new-comment-handler")
 	}
 
 	if err := app.Listen(":8084"); err != nil {

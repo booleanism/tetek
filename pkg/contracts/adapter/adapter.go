@@ -6,16 +6,16 @@ import (
 
 	mqAcc "github.com/booleanism/tetek/account/infra/messaging/rabbitmq"
 	mqAuth "github.com/booleanism/tetek/auth/infra/messaging/rabbitmq"
-	mqComm "github.com/booleanism/tetek/comments/amqp"
+	mqComm "github.com/booleanism/tetek/comments/infra/messaging/rabbitmq"
 	msgFeeds "github.com/booleanism/tetek/feeds/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/errro"
 )
 
 type (
-	AccountAdapterFn  = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
-	AuthAdapterFn     = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
-	FeedsAdapterFn    = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
+	AccountAdapterFn  = func(ctx context.Context, comms contracts.CommentsDealer, task mqAcc.AccountTask, res **mqAcc.AccountResult) errro.Error
+	AuthAdapterFn     = func(ctx context.Context, comms contracts.AuthDealer, task mqAuth.AuthTask, res **mqAuth.AuthResult) errro.Error
+	FeedsAdapterFn    = func(ctx context.Context, comms contracts.FeedsDealer, task msgFeeds.FeedsTask, res **msgFeeds.FeedsResult) errro.Error
 	CommentsAdapterFn = func(ctx context.Context, comms contracts.CommentsDealer, task mqComm.CommentsTask, res **mqComm.CommentsResult) errro.Error
 )
 
@@ -37,13 +37,13 @@ func CommentsAdapter(ctx context.Context, comms contracts.CommentsDealer, task m
 
 func adapter(ctx context.Context, d any, t any, r any) errro.Error {
 	if err := d.(contracts.Dealer).Publish(ctx, t); err != nil {
-		e := errro.FromError(errro.ErrAccountServiceUnavailable, fmt.Sprintf("failed to publish %s task", d.(contracts.Dealer).Name()), err)
+		e := errro.FromError(errro.ErrServiceUnavailable, fmt.Sprintf("failed to publish %s task", d.(contracts.Dealer).Name()), err)
 		return e
 	}
 
 	err := d.(contracts.Dealer).Consume(ctx, r)
 	if err != nil {
-		e := errro.FromError(errro.ErrAccountServiceUnavailable, fmt.Sprintf("failed consuming %s result", d.(contracts.Dealer).Name()), err)
+		e := errro.FromError(errro.ErrServiceUnavailable, fmt.Sprintf("failed consuming %s result", d.(contracts.Dealer).Name()), err)
 		return e
 	}
 	return nil

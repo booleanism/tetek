@@ -49,17 +49,17 @@ const (
 )
 
 const (
-	Success           = 0
-	ErrInvalidRequest = ErrAccountParseFail
-	ErrLogging        = -9
-	ErrTimeout        = -13
-	ErrAcqPool        = -18
+	Success               = 0
+	ErrInvalidRequest     = ErrAccountParseFail
+	ErrLogging            = -9
+	ErrTimeout            = -13
+	ErrAcqPool            = -18
+	ErrServiceUnavailable = ErrAccountServiceUnavailable
 )
 
 const (
 	ErrAuthJWTGenerationFail = -7
 	ErrAuthFailRetrieveUser  = -5
-	ErrServiceUnavailable    = ErrAccountServiceUnavailable
 	ErrAuthParseFail         = ErrAccountParseFail
 	ErrAuthJWTVerifyFail     = 4
 	ErrAuthEmptyJWT          = 19
@@ -87,18 +87,20 @@ const (
 )
 
 const (
-	ErrCommDBError       = ErrFeedsDBError
-	ErrCommQueryError    = -14
-	ErrCommInsertError   = -19
-	ErrCommScanError     = -15
-	ErrCommBuildTreeFail = -10
-	ErrCommPubFail       = -11
-	ErrCommConsumeFail   = -12
-	ErrCommNoConsume     = ErrAccountNoUser
-	ErrCommAcquirePool   = -16
-	ErrCommUnknownCmd    = 20
-	ErrCommParseFail     = ErrAccountParseFail
-	ErrCommNoComments    = ErrFeedsNoFeeds
+	ErrCommDBError              = ErrFeedsDBError
+	ErrCommNewFail              = ErrFeedsNewFail
+	ErrCommMissingRequiredField = ErrFeedsMissingRequiredField
+	ErrCommQueryError           = -14
+	ErrCommInsertError          = -19
+	ErrCommScanError            = -15
+	ErrCommBuildTreeFail        = -10
+	ErrCommPubFail              = -11
+	ErrCommConsumeFail          = -12
+	ErrCommNoConsume            = ErrAccountNoUser
+	ErrCommAcquirePool          = -16
+	ErrCommUnknownCmd           = 20
+	ErrCommParseFail            = ErrAccountParseFail
+	ErrCommNoComments           = ErrFeedsNoFeeds
 )
 
 type Err struct {

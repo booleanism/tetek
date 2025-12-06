@@ -3,7 +3,7 @@ package model
 import (
 	"time"
 
-	"github.com/booleanism/tetek/comments/amqp"
+	messaging "github.com/booleanism/tetek/comments/infra/messaging/rabbitmq"
 	"github.com/booleanism/tetek/feeds/internal/domain/entities"
 	"github.com/google/uuid"
 )
@@ -14,7 +14,7 @@ var AvailableType = []string{"M", "J", "S", "A"}
 
 type FeedWithComments struct {
 	entities.Feed
-	Comments []amqp.Comment `json:"comments"`
+	Comments []messaging.Comment `json:"comments"`
 }
 
 type FeedDeletion struct {

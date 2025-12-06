@@ -1,15 +1,16 @@
-package contract_test
+package messaging_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
-	"github.com/booleanism/tetek/comments/amqp"
-	"github.com/booleanism/tetek/comments/internal/contract"
-	"github.com/booleanism/tetek/comments/internal/repo"
+	messaging "github.com/booleanism/tetek/comments/infra/messaging/rabbitmq"
+	imessaging "github.com/booleanism/tetek/comments/internal/infra/messaging/rabbitmq"
+	"github.com/booleanism/tetek/comments/internal/usecases"
+	"github.com/booleanism/tetek/comments/internal/usecases/repo"
 	"github.com/booleanism/tetek/comments/schemas"
-	"github.com/booleanism/tetek/db"
+	db "github.com/booleanism/tetek/infra/db/sql"
 	"github.com/booleanism/tetek/pkg/contracts"
 	"github.com/booleanism/tetek/pkg/contracts/adapter"
 	"github.com/booleanism/tetek/pkg/errro"
@@ -90,7 +91,7 @@ func TestMain(m *testing.M) {
 }
 
 type testData struct {
-	amqp.CommentsTask
+	messaging.CommentsTask
 	expected int
 }
 
@@ -103,11 +104,12 @@ func TestWorker(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	repo := repo.NewCommRepo(p)
+	repo := repo.NewCommentsRepo(p)
+	uc := usecases.NewCommentsUsecases(repo)
 
 	ctx := context.WithValue(context.Background(), keystore.RequestID{}, "test")
 
-	contr := contract.NewComments(mqCon, repo)
+	contr := imessaging.NewComments(mqCon, uc)
 	ch, err := contr.WorkerCommentsListener(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -125,40 +127,47 @@ func TestWorker(t *testing.T) {
 
 	data := []testData{
 		{
-			CommentsTask: amqp.CommentsTask{
+			CommentsTask: messaging.CommentsTask{
 				Cmd: 1,
-				Comment: amqp.Comment{
+				Comment: messaging.Comment{
 					Parent: parentPass,
 				},
 			},
 			expected: errro.ErrCommUnknownCmd,
 		},
 		{
-			CommentsTask: amqp.CommentsTask{
+			CommentsTask: messaging.CommentsTask{
 				Cmd: 0,
-				Comment: amqp.Comment{
+				Comment: messaging.Comment{
 					Parent: parentPass,
 				},
 			},
 			expected: errro.Success,
 		},
 		{
-			CommentsTask: amqp.CommentsTask{
+			CommentsTask: messaging.CommentsTask{
 				Cmd:     0,
-				Comment: amqp.Comment{},
+				Comment: messaging.Comment{Parent: uuid.New()},
 			},
 			expected: errro.ErrCommNoComments,
 		},
 		{
-			CommentsTask: amqp.CommentsTask{
+			CommentsTask: messaging.CommentsTask{
 				Cmd:     0,
-				Comment: amqp.Comment{},
+				Comment: messaging.Comment{},
+			},
+			expected: errro.ErrCommMissingRequiredField,
+		},
+		{
+			CommentsTask: messaging.CommentsTask{
+				Cmd:     0,
+				Comment: messaging.Comment{Parent: uuid.New()},
 			},
 			expected: errro.ErrCommDBError,
 		},
 	}
 
-	res := &amqp.CommentsResult{}
+	res := &messaging.CommentsResult{}
 	assent := contracts.CommentsAssent(mqCon)
 	if err := assent.CommentsResListener(ctx, "test"); err != nil {
 		t.Fatal(err)

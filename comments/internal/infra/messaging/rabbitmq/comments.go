@@ -1,29 +1,29 @@
-package contract
+package messaging
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 
-	"github.com/booleanism/tetek/comments/amqp"
-	"github.com/booleanism/tetek/comments/internal/pools"
-	"github.com/booleanism/tetek/comments/internal/repo"
+	messaging "github.com/booleanism/tetek/comments/infra/messaging/rabbitmq"
+	"github.com/booleanism/tetek/comments/internal/usecases"
+	"github.com/booleanism/tetek/comments/internal/usecases/dto"
+	"github.com/booleanism/tetek/comments/internal/usecases/pools"
 	"github.com/booleanism/tetek/pkg/errro"
 	"github.com/booleanism/tetek/pkg/helper"
 	"github.com/booleanism/tetek/pkg/keystore"
 	"github.com/booleanism/tetek/pkg/loggr"
 	"github.com/go-logr/logr"
-	"github.com/jackc/pgx/v5"
 	"github.com/rabbitmq/amqp091-go"
 )
 
 type CommentsContr struct {
-	con  *amqp091.Connection
-	repo repo.CommentsRepo
+	con *amqp091.Connection
+	uc  usecases.GetCommentsUseCase
 }
 
-func NewComments(con *amqp091.Connection, repo repo.CommentsRepo) *CommentsContr {
-	return &CommentsContr{con, repo}
+func NewComments(con *amqp091.Connection, uc usecases.GetCommentsUseCase) *CommentsContr {
+	return &CommentsContr{con, uc}
 }
 
 func (c *CommentsContr) WorkerCommentsListener(ctx context.Context) (*amqp091.Channel, error) {
@@ -34,13 +34,13 @@ func (c *CommentsContr) WorkerCommentsListener(ctx context.Context) (*amqp091.Ch
 		return nil, err
 	}
 
-	err = amqp.CommentsSetup(ch)
+	err = messaging.CommentsSetup(ch)
 	if err != nil {
 		log.Error(err, "failed to setup account topic")
 		return nil, err
 	}
 
-	mgs, err := ch.Consume(amqp.CommentsTaskQueue, "", false, false, false, false, nil)
+	mgs, err := ch.Consume(messaging.CommentsTaskQueue, "", false, false, false, false, nil)
 	if err != nil {
 		log.Error(err, "failed to consume account task")
 		return nil, err
@@ -55,20 +55,19 @@ func (c *CommentsContr) WorkerCommentsListener(ctx context.Context) (*amqp091.Ch
 				continue
 			}
 
-			task := amqp.CommentsTask{}
+			task := messaging.CommentsTask{}
 			err := json.Unmarshal(d.Body, &task)
 			if err != nil {
 				log.V(1).Info("failed to marshal account task", "requestID", d.CorrelationId, "error", err, "body", d.Body)
-				res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.ErrCommParseFail, Message: "error parsing comments task"})
+				res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.ErrCommParseFail, Message: "error parsing comments task"})
 				commentsResultPublisher(log, task, ch, d, res, err)
 				continue
 			}
 
 			func() {
-				cf := repo.CommentFilter{Head: task.Parent}
 				fBuf, ok := pools.CommentsPool.Get().(*pools.Comments)
 				if !ok {
-					res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.ErrCommAcquirePool, Message: "cannot acquire comments pool"})
+					res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.ErrCommAcquirePool, Message: "cannot acquire comments pool"})
 					commentsResultPublisher(log, task, ch, d, res, fmt.Errorf("failed to acquire comments pool"))
 					return
 				}
@@ -76,25 +75,32 @@ func (c *CommentsContr) WorkerCommentsListener(ctx context.Context) (*amqp091.Ch
 				defer fBuf.Reset()
 
 				if task.Cmd == 0 {
-					n, err := c.repo.GetComments(ctx, cf, &fBuf.Value)
+					gcr := dto.GetCommentsRequest{Head: task.Parent}
+					n, err := c.uc.GetComments(ctx, gcr, &fBuf.Value)
 					if err == nil && n != 0 {
-						res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.Success, Message: "comments found", Details: fBuf.Value[0:n]})
+						res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.Success, Message: "comments found", Details: fBuf.Value[0:n]})
 						commentsResultPublisher(log, task, ch, d, res, err)
 						return
 					}
 
-					if err == pgx.ErrNoRows {
-						res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.ErrCommNoComments, Message: "comments not found"})
+					if err.Code() == errro.ErrCommMissingRequiredField {
+						res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.ErrCommMissingRequiredField, Message: "missing required field"})
 						commentsResultPublisher(log, task, ch, d, res, err)
 						return
 					}
 
-					res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.ErrCommDBError, Message: "something happen in our end"})
+					if err.Code() == errro.ErrCommNoComments {
+						res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.ErrCommNoComments, Message: "comments not found"})
+						commentsResultPublisher(log, task, ch, d, res, err)
+						return
+					}
+
+					res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.ErrCommDBError, Message: "something happen in our end"})
 					commentsResultPublisher(log, task, ch, d, res, err)
 					return
 				}
 
-				res, _ := json.Marshal(&amqp.CommentsResult{Code: errro.ErrCommUnknownCmd, Message: "unknown command"})
+				res, _ := json.Marshal(&messaging.CommentsResult{Code: errro.ErrCommUnknownCmd, Message: "unknown command"})
 				commentsResultPublisher(log, task, ch, d, res, fmt.Errorf("unexpected command"))
 			}()
 		}
@@ -105,13 +111,13 @@ func (c *CommentsContr) WorkerCommentsListener(ctx context.Context) (*amqp091.Ch
 
 func commentsResultPublisher(log logr.Logger, task any, ch *amqp091.Channel, d amqp091.Delivery, res []byte, e error) {
 	log = log.WithName("comments-result-publisher")
-	err := ch.Publish(amqp.CommentsExchange, amqp.CommentsResRk, false, false, amqp091.Publishing{
+	err := ch.Publish(messaging.CommentsExchange, messaging.CommentsResRk, false, false, amqp091.Publishing{
 		CorrelationId: d.CorrelationId,
 		Body:          res,
 		ContentType:   "text/json",
 	})
 	if err != nil {
-		log.Error(err, "failed to publish comments result", "result", res, "exchange", amqp.CommentsExchange, "routing-key", amqp.CommentsResRk)
+		log.Error(err, "failed to publish comments result", "result", res, "exchange", messaging.CommentsExchange, "routing-key", messaging.CommentsResRk)
 		helper.Nack(log, d, "unable to publish comments result", "task", task)
 		return
 	}

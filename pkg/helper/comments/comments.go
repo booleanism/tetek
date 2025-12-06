@@ -3,12 +3,12 @@ package helper
 import (
 	"sort"
 
-	"github.com/booleanism/tetek/comments/amqp"
+	messaging "github.com/booleanism/tetek/comments/infra/messaging/rabbitmq"
 	"github.com/google/uuid"
 )
 
-func BuildCommentTree(tables []amqp.Comment, head uuid.UUID) []amqp.Comment {
-	tree := []amqp.Comment{}
+func BuildCommentTree(tables []messaging.Comment, head uuid.UUID) []messaging.Comment {
+	tree := []messaging.Comment{}
 	for _, v := range tables {
 		if v.Parent.String() == head.String() {
 			v.Child = BuildCommentTree(tables, v.ID)
